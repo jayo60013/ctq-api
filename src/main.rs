@@ -69,7 +69,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let cors_config = || {
             Cors::default()
-                .allowed_origin("https://crackthequote.umbra.mom")
+                .allowed_origin("http://localhost:3000")
                 .allowed_methods(vec!["GET", "POST", "OPTIONS"])
                 .allowed_headers(vec![http::header::CONTENT_TYPE])
                 .max_age(3600)
