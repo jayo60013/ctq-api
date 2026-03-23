@@ -10,6 +10,19 @@ use crate::{
 };
 
 pub async fn initialise_quotes_table(pool: &PgPool) -> Result<u64> {
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS quotes (
+            id SERIAL PRIMARY KEY,
+            author TEXT NOT NULL,
+            quote TEXT NOT NULL
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .context("Failed to create quotes table")?;
+
     let quotes = get_all_quotes_from_json().context("Failed to read quotes file")?;
 
     let inserted = insert_quotes(pool, quotes)
