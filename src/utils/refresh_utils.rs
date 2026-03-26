@@ -51,6 +51,7 @@ async fn refresh_once(
 
     let new_response = DailyPuzzleResponse {
         author: new_puzzle.author.clone(),
+        source: new_puzzle.source.clone(),
         cipher_quote: new_puzzle.cipher_quote.clone(),
         date_string: new_puzzle.date_string.clone(),
         day_number: new_puzzle.day_number,

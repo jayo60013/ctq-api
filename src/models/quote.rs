@@ -8,4 +8,7 @@ pub struct Quote {
 
     #[serde(rename = "Author")]
     pub author: String,
+
+    #[serde(rename = "Source")]
+    pub source: Option<String>,
 }

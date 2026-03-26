@@ -4,6 +4,7 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 pub struct DailyPuzzleResponse {
     pub author: String,
+    pub source: Option<String>,
     pub cipher_quote: String,
     pub date_string: String,
     pub day_number: u16,
@@ -12,6 +13,7 @@ pub struct DailyPuzzleResponse {
 pub fn get_empty_daily_puzzle_response() -> DailyPuzzleResponse {
     DailyPuzzleResponse {
         author: "".to_string(),
+        source: None,
         cipher_quote: "".to_string(),
         date_string: "".to_string(),
         day_number: 0,

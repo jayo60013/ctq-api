@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub struct DailyPuzzle {
     pub cipher_quote: String,
     pub author: String,
+    pub source: Option<String>,
     pub date_string: String,
     pub day_number: u16,
     pub cipher_map: HashMap<char, char>,
@@ -13,6 +14,7 @@ pub fn get_empty_daily_puzzle() -> DailyPuzzle {
     DailyPuzzle {
         cipher_quote: "".to_string(),
         author: "".to_string(),
+        source: None,
         date_string: "".to_string(),
         day_number: 0,
         cipher_map: HashMap::new(),

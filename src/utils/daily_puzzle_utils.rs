@@ -27,6 +27,7 @@ pub async fn get_daily_puzzle_entity(pool: &PgPool) -> anyhow::Result<DailyPuzzl
     let daily_puzzle = DailyPuzzle {
         cipher_quote,
         author: daily_quote.author,
+        source: daily_quote.source,
         date_string,
         day_number: day_number as u16,
         cipher_map: inverse(cipher_map),
@@ -51,7 +52,8 @@ async fn get_daily_quote(pool: &PgPool) -> anyhow::Result<Quote> {
     let id = ((days + 1).rem_euclid(quotes_count)) as i64;
     info!("id={}", id);
 
-    let quote = sqlx::query_as::<_, Quote>("SELECT quote, author FROM quotes WHERE id=$1")
+    let quote =
+        sqlx::query_as::<_, Quote>("SELECT quote, author, source FROM quotes WHERE id=$1")
         .bind(id)
         .fetch_one(pool)
         .await?;

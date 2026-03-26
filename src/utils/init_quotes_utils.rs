@@ -15,13 +15,19 @@ pub async fn initialise_quotes_table(pool: &PgPool) -> Result<u64> {
         CREATE TABLE IF NOT EXISTS quotes (
             id SERIAL PRIMARY KEY,
             author TEXT NOT NULL,
-            quote TEXT NOT NULL
+            quote TEXT NOT NULL,
+            source TEXT
         )
         "#,
     )
     .execute(pool)
     .await
     .context("Failed to create quotes table")?;
+
+    sqlx::query("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS source TEXT")
+        .execute(pool)
+        .await
+        .context("Failed to update quotes table schema")?;
 
     let quotes = get_all_quotes_from_json().context("Failed to read quotes file")?;
 
@@ -47,19 +53,25 @@ fn get_all_quotes_from_json() -> Result<Vec<Quote>> {
 }
 
 async fn insert_quotes(pool: &PgPool, items: Vec<Quote>) -> Result<u64> {
-    let (authors, quotes): (Vec<String>, Vec<String>) = items
-        .into_iter()
-        .map(|q| (q.author.to_owned(), q.quote.to_owned()))
-        .unzip();
+    let mut quotes = Vec::with_capacity(items.len());
+    let mut authors = Vec::with_capacity(items.len());
+    let mut sources = Vec::with_capacity(items.len());
+
+    for q in items {
+        quotes.push(q.quote);
+        authors.push(q.author);
+        sources.push(q.source);
+    }
 
     let res = sqlx::query(
         r#"
-        INSERT INTO quotes (quote, author)
-        SELECT * FROM UNNEST($1::text[], $2::text[])
+        INSERT INTO quotes (quote, author, source)
+        SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[])
         "#,
     )
     .bind(&quotes)
     .bind(&authors)
+    .bind(&sources)
     .execute(pool)
     .await?;
 
