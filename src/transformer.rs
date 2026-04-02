@@ -17,7 +17,9 @@ pub fn parse_cipher_map_from_json(value: &Value) -> Result<HashMap<char, char>, 
                         map.insert(key_char, s.chars().next().unwrap());
                     }
                     _ => {
-                        return Err("cipher_map values must be single character strings".to_string());
+                        return Err(
+                            "cipher_map values must be single character strings".to_string()
+                        );
                     }
                 }
             }
@@ -36,7 +38,7 @@ mod tests {
     fn test_parse_cipher_map_from_json_valid() {
         // Given
         let json = serde_json::json!({ "a": "b", "c": "d" });
-        let expected = HashMap::from([('a','b'), ('c','d')]);
+        let expected = HashMap::from([('a', 'b'), ('c', 'd')]);
 
         // When
         let actual = parse_cipher_map_from_json(&json).unwrap();

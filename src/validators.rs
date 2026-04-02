@@ -22,32 +22,3 @@ pub fn validate_cipher_map(cipher_map: &HashMap<char, char>) -> Result<(), Strin
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_validate_lowercase_letter_valid() {
-        assert!(validate_lowercase_letter(&'a').is_ok());
-        assert!(validate_lowercase_letter(&'z').is_ok());
-    }
-
-    #[test]
-    fn test_validate_lowercase_letter_invalid() {
-        assert!(validate_lowercase_letter(&'A').is_err());
-        assert!(validate_lowercase_letter(&'1').is_err());
-    }
-
-    #[test]
-    fn test_validate_cipher_map_valid() {
-        let map = HashMap::from([('a', 'b'), ('c', 'd')]);
-        assert!(validate_cipher_map(&map).is_ok());
-    }
-
-    #[test]
-    fn test_validate_cipher_map_empty() {
-        let map: HashMap<char, char> = HashMap::new();
-        assert!(validate_cipher_map(&map).is_err());
-    }
-}

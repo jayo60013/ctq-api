@@ -7,12 +7,7 @@ use actix_web::{
 use std::fmt;
 
 impl ProblemDetails {
-    pub fn new(
-        title: &str,
-        status: StatusCode,
-        detail: &str,
-        instance: Option<String>,
-    ) -> Self {
+    pub fn new(title: &str, status: StatusCode, detail: &str, instance: Option<String>) -> Self {
         ProblemDetails {
             title: title.to_string(),
             status: status.as_u16(),
@@ -31,12 +26,7 @@ impl ProblemDetails {
     }
 
     pub fn invalid_request(detail: &str, instance: Option<String>) -> Self {
-        ProblemDetails::new(
-            "Invalid request",
-            StatusCode::BAD_REQUEST,
-            detail,
-            instance,
-        )
+        ProblemDetails::new("Invalid request", StatusCode::BAD_REQUEST, detail, instance)
     }
 
     pub fn validation_error(detail: &str, instance: Option<String>) -> Self {
@@ -102,9 +92,15 @@ impl ResponseError for ApiError {
             ApiError::DatabaseError(msg) => {
                 tracing::error!("Database error: {msg}");
                 let (status, details) = if msg == "Puzzle not generated yet" {
-                    (StatusCode::SERVICE_UNAVAILABLE, ProblemDetails::puzzle_not_generated(None))
+                    (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        ProblemDetails::puzzle_not_generated(None),
+                    )
                 } else {
-                    (StatusCode::INTERNAL_SERVER_ERROR, ProblemDetails::internal_error(None))
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        ProblemDetails::internal_error(None),
+                    )
                 };
                 HttpResponse::build(status).json(details)
             }

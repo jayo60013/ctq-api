@@ -28,7 +28,6 @@ struct CachedPuzzle {
 }
 
 impl DailyPuzzleCache {
-
     pub fn new() -> Self {
         Self {
             response: Arc::new(RwLock::new(None)),
@@ -91,10 +90,15 @@ impl DailyPuzzleCache {
         }
 
         let puzzle_id = Self::calculate_puzzle_id(today, config);
-        let db_puzzle = pool_repo.get_by_id(puzzle_id).await.map_err(|err| match err {
-            ApiError::NotFound => ApiError::DatabaseError("Puzzle not generated yet".to_string()),
-            other => other,
-        })?;
+        let db_puzzle = pool_repo
+            .get_by_id(puzzle_id)
+            .await
+            .map_err(|err| match err {
+                ApiError::NotFound => {
+                    ApiError::DatabaseError("Puzzle not generated yet".to_string())
+                }
+                other => other,
+            })?;
 
         let response = PuzzleResponse {
             id: db_puzzle.id,
