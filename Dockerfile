@@ -2,9 +2,19 @@ FROM rust:1.94-alpine AS builder
 
 WORKDIR /app
 
-COPY Cargo.toml Cargo.lock ./
+# Copy manifests
+COPY Cargo.toml ./
+
+# Build dependencies (layer caching)
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# Copy source code
 COPY src ./src
 
+# Build application
 RUN cargo build --release
 
 FROM debian:bookworm-slim
