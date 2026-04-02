@@ -1,25 +1,20 @@
-FROM rust:slim AS builder
+FROM rust:1.94-alpine AS builder
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY . .
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
 
 RUN cargo build --release
 
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
-    libssl-dev \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-COPY --from=builder /usr/src/app/target/release/crack-the-quote-api /app/server
-
-COPY --from=builder /usr/src/app/quotes.json /app/quotes.json
-COPY --from=builder /usr/src/app/sql /app/sql
+COPY --from=builder /app/target/release/crack-the-quote-api /usr/local/bin/
 
 EXPOSE 9100
 
-CMD ["./server"]
+CMD ["crack-the-quote-api"]
