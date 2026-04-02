@@ -23,8 +23,8 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/crack-the-quote-api /usr/local/bin/
+COPY --from=builder /app/target/release/ctq-api /usr/local/bin/
 
 EXPOSE 9100
 
-CMD ["crack-the-quote-api"]
+CMD ["ctq-api"]
