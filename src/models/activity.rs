@@ -21,5 +21,3 @@ pub struct ActivityUpdateRequest {
     pub checks_used: u16,
     pub solves_used: u16,
 }
-
-

@@ -9,7 +9,7 @@ pub mod quote_row;
 pub mod solve_letter;
 pub mod user;
 
-pub use activity::{ActivityUpdateRequest, ActivityRow};
+pub use activity::{ActivityRow, ActivityUpdateRequest};
 pub use auth::{AuthResponse, GoogleIdTokenPayload, GoogleTokenResponse};
 pub use check_letter::{CheckLetterRequest, CheckLetterResponse};
 pub use check_quote::{CheckQuoteRequest, CheckQuoteResponse};

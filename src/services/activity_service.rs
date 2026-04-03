@@ -5,8 +5,8 @@ use uuid::Uuid;
 use crate::config::EnvConfig;
 use crate::error::ApiError;
 use crate::models::{ActivityRow, ActivityUpdateRequest};
-use crate::repository::upsert_activity;
 use crate::repository::get_activity;
+use crate::repository::upsert_activity;
 use crate::validators::validate_activity_request;
 
 pub struct ActivityService;
@@ -33,9 +33,12 @@ impl ActivityService {
         )
         .await?;
 
-        let activity: ActivityRow = get_activity(pool, user_id, puzzle_id)
-            .await?
-            .ok_or_else(|| ApiError::DatabaseError("Activity not found after insert".to_string()))?;
+        let activity: ActivityRow =
+            get_activity(pool, user_id, puzzle_id)
+                .await?
+                .ok_or_else(|| {
+                    ApiError::DatabaseError("Activity not found after insert".to_string())
+                })?;
 
         Ok(activity.current_streak)
     }
