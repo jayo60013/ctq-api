@@ -1,17 +1,20 @@
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use sqlx::PgPool;
 use validator::Validate;
 
+use crate::services::ActivityService;
 use crate::{
     config::EnvConfig,
     error::ApiError,
+    middleware::extract_authenticated_user,
     models::{
-        CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse,
-        PuzzleResponse, SolveLetterRequest, SolveLetterResponse,
+        ActivityUpdateRequest, CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest,
+        CheckQuoteResponse, PuzzleResponse, SolveLetterRequest, SolveLetterResponse,
     },
     puzzle_cache::DailyPuzzleCache,
     repository::PuzzleRepository,
-    services::PuzzleService,
+    services::{JwtService, PuzzleService},
+    validators,
 };
 
 #[get("/daily")]
@@ -81,17 +84,47 @@ async fn check_daily_quote(
     config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
     req: web::Json<CheckQuoteRequest>,
+    http_req: HttpRequest,
 ) -> Result<HttpResponse, ApiError> {
     req.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
+
+    validators::validate_activity_request(&ActivityUpdateRequest {
+        checks_used: req.checks_used,
+        solves_used: req.solves_used,
+    })?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
     let puzzle = cache.get_puzzle(&repo, &config).await?;
 
     let is_correct = PuzzleService::check_quote(&req.cipher_map, &puzzle.cipher_map);
 
+    let jwt_service = JwtService::new(&config.jwt_secret);
+    let mut streak = None;
+
+    if let Ok(user) = extract_authenticated_user(&http_req, &jwt_service) {
+        let puzzle_id = ActivityService::calculate_puzzle_id_for_daily(&config);
+        let activity_req = ActivityUpdateRequest {
+            checks_used: req.checks_used,
+            solves_used: req.solves_used,
+        };
+        let current_streak = ActivityService::track_activity(
+            pool.get_ref(),
+            user.id,
+            puzzle_id,
+            is_correct,
+            true,
+            &activity_req,
+        )
+        .await
+        .unwrap_or(0);
+
+        streak = Some(current_streak);
+    }
+
     let response = CheckQuoteResponse {
         is_quote_correct: is_correct,
+        streak,
     };
     Ok(HttpResponse::Ok().json(response))
 }

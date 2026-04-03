@@ -3,16 +3,18 @@ use sqlx::PgPool;
 use validator::Validate;
 
 use crate::models::PuzzleResponse;
+use crate::services::ActivityService;
 use crate::{
     config::EnvConfig,
     error::ApiError,
-    middleware::extract_authenticated_user,
+    middleware,
     models::{
-        CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse,
-        SolveLetterRequest, SolveLetterResponse,
+        ActivityUpdateRequest, CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest,
+        CheckQuoteResponse, SolveLetterRequest, SolveLetterResponse,
     },
     repository::PuzzleRepository,
     services::{JwtService, PuzzleService},
+    validators,
 };
 
 #[get("/{id}")]
@@ -23,7 +25,7 @@ async fn get_puzzle(
     req: HttpRequest,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
-    let _user = extract_authenticated_user(&req, &jwt_service)?;
+    let _user = middleware::extract_authenticated_user(&req, &jwt_service)?;
 
     let puzzle_id = *id;
     let repo = PuzzleRepository::new(pool.get_ref().clone());
@@ -49,7 +51,7 @@ async fn check_letter(
     body: web::Json<CheckLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
-    let _user = extract_authenticated_user(&req, &jwt_service)?;
+    let _user = middleware::extract_authenticated_user(&req, &jwt_service)?;
 
     body.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
@@ -75,7 +77,7 @@ async fn solve_letter(
     body: web::Json<SolveLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
-    let _user = extract_authenticated_user(&req, &jwt_service)?;
+    let _user = middleware::extract_authenticated_user(&req, &jwt_service)?;
 
     body.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
@@ -98,18 +100,38 @@ async fn check_quote(
     body: web::Json<CheckQuoteRequest>,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
-    let _user = extract_authenticated_user(&req, &jwt_service)?;
+    let user = middleware::extract_authenticated_user(&req, &jwt_service)?;
 
     body.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
+
+    validators::validate_activity_request(&ActivityUpdateRequest {
+        checks_used: body.checks_used,
+        solves_used: body.solves_used,
+    })?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
     let puzzle = repo.get_by_id(*id).await?;
 
     let is_correct = PuzzleService::check_quote(&body.cipher_map, &puzzle.cipher_map);
 
+    let activity_req = ActivityUpdateRequest {
+        checks_used: body.checks_used,
+        solves_used: body.solves_used,
+    };
+    let _ = ActivityService::track_activity(
+        pool.get_ref(),
+        user.id,
+        *id,
+        is_correct,
+        false,
+        &activity_req,
+    )
+    .await;
+
     let response = CheckQuoteResponse {
         is_quote_correct: is_correct,
+        streak: None,
     };
     Ok(HttpResponse::Ok().json(response))
 }

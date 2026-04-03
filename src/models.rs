@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod auth;
 pub mod check_letter;
 pub mod check_quote;
@@ -8,6 +9,7 @@ pub mod quote_row;
 pub mod solve_letter;
 pub mod user;
 
+pub use activity::{ActivityUpdateRequest, ActivityRow};
 pub use auth::{AuthResponse, GoogleIdTokenPayload, GoogleTokenResponse};
 pub use check_letter::{CheckLetterRequest, CheckLetterResponse};
 pub use check_quote::{CheckQuoteRequest, CheckQuoteResponse};

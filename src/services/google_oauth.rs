@@ -70,12 +70,13 @@ impl GoogleOAuthService {
             .body(body)
             .send()
             .await
-            .map_err(|e| ApiError::ExternalServiceError(format!("Google token request failed: {e}")))?;
+            .map_err(|e| {
+                ApiError::ExternalServiceError(format!("Google token request failed: {e}"))
+            })?;
 
-        let token_response: GoogleTokenResponse = response
-            .json()
-            .await
-            .map_err(|e| ApiError::ExternalServiceError(format!("Failed to parse token response: {e}")))?;
+        let token_response: GoogleTokenResponse = response.json().await.map_err(|e| {
+            ApiError::ExternalServiceError(format!("Failed to parse token response: {e}"))
+        })?;
 
         Ok(token_response.id_token)
     }
