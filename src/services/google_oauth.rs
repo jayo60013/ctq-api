@@ -1,0 +1,110 @@
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::engine::Engine;
+use rand::{distributions::Alphanumeric, Rng};
+use sha2::{Digest, Sha256};
+use url::Url;
+
+use crate::error::ApiError;
+use crate::models::{GoogleIdTokenPayload, GoogleTokenResponse};
+
+pub struct GoogleOAuthService {
+    client_id: String,
+    client_secret: String,
+    redirect_uri: String,
+}
+
+impl GoogleOAuthService {
+    pub fn new(client_id: String, client_secret: String, redirect_uri: String) -> Self {
+        GoogleOAuthService {
+            client_id,
+            client_secret,
+            redirect_uri,
+        }
+    }
+
+    pub fn generate_pkce_pair() -> (String, String) {
+        // Generate 128‑char verifier using Alphanumeric + allowed symbols
+        let mut rng = rand::thread_rng();
+        let code_verifier: String = (0..128).map(|_| rng.sample(Alphanumeric) as char).collect();
+
+        // Compute challenge
+        let hash = Sha256::digest(code_verifier.as_bytes());
+        let code_challenge = URL_SAFE_NO_PAD.encode(hash);
+
+        (code_verifier, code_challenge)
+    }
+
+    pub fn create_auth_url(&self, state: &str, code_challenge: &str) -> String {
+        let mut url = Url::parse("https://accounts.google.com/o/oauth2/v2/auth").unwrap();
+        url.query_pairs_mut()
+            .append_pair("client_id", &self.client_id)
+            .append_pair("redirect_uri", &self.redirect_uri)
+            .append_pair("response_type", "code")
+            .append_pair("scope", "openid email profile")
+            .append_pair("state", state)
+            .append_pair("code_challenge", code_challenge)
+            .append_pair("code_challenge_method", "S256");
+
+        url.to_string()
+    }
+
+    pub async fn exchange_code_for_token(
+        &self,
+        code: &str,
+        code_verifier: &str,
+    ) -> Result<String, ApiError> {
+        let client = reqwest::Client::new();
+
+        let params = [
+            ("client_id", self.client_id.as_str()),
+            ("client_secret", self.client_secret.as_str()),
+            ("code", code),
+            ("code_verifier", code_verifier),
+            ("grant_type", "authorization_code"),
+            ("redirect_uri", self.redirect_uri.as_str()),
+        ];
+
+        let response = client
+            .post("https://oauth2.googleapis.com/token")
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| {
+                ApiError::ExternalServiceError(format!("Google token request failed: {e}"))
+            })?;
+
+        let token_response: GoogleTokenResponse = response.json().await.map_err(|e| {
+            ApiError::ExternalServiceError(format!("Failed to parse token response: {e}"))
+        })?;
+
+        Ok(token_response.id_token)
+    }
+
+    pub async fn verify_id_token(&self, id_token: &str) -> Result<GoogleIdTokenPayload, ApiError> {
+        let client = reqwest::Client::new();
+
+        let url = format!("https://www.googleapis.com/oauth2/v1/tokeninfo?id_token={id_token}");
+
+        let response = client.get(&url).send().await.map_err(|e| {
+            ApiError::ExternalServiceError(format!("Token verification request failed: {e}"))
+        })?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::ExternalServiceError(
+                "Token verification failed".to_string(),
+            ));
+        }
+
+        let payload: GoogleIdTokenPayload = response.json().await.map_err(|e| {
+            ApiError::ExternalServiceError(format!("Failed to parse token payload: {e}"))
+        })?;
+
+        if payload.aud != self.client_id {
+            return Err(ApiError::ExternalServiceError(
+                "Invalid audience in token".to_string(),
+            ));
+        }
+
+        Ok(payload)
+    }
+}

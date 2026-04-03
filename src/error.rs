@@ -1,8 +1,8 @@
 use crate::models::ProblemDetails;
 use actix_web::{
-    HttpResponse,
     error::{JsonPayloadError, ResponseError},
     http::StatusCode,
+    HttpResponse,
 };
 use std::fmt;
 
@@ -70,6 +70,9 @@ pub enum ApiError {
     ValidationError(String),
     DatabaseError(String),
     NotFound,
+    JwtError(String),
+    ExternalServiceError(String),
+    Unauthorized,
 }
 
 impl fmt::Display for ApiError {
@@ -78,11 +81,30 @@ impl fmt::Display for ApiError {
             ApiError::ValidationError(msg) => write!(f, "Validation error: {msg}"),
             ApiError::DatabaseError(msg) => write!(f, "Database error: {msg}"),
             ApiError::NotFound => write!(f, "Resource not found"),
+            ApiError::JwtError(msg) => write!(f, "JWT error: {msg}"),
+            ApiError::ExternalServiceError(msg) => write!(f, "External service error: {msg}"),
+            ApiError::Unauthorized => write!(f, "Unauthorized"),
         }
     }
 }
 
 impl ResponseError for ApiError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            ApiError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            ApiError::DatabaseError(msg) => {
+                if msg == "Puzzle not generated yet" {
+                    StatusCode::SERVICE_UNAVAILABLE
+                } else {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+            }
+            ApiError::NotFound => StatusCode::NOT_FOUND,
+            ApiError::JwtError(_) | ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
+            ApiError::ExternalServiceError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+
     fn error_response(&self) -> HttpResponse {
         match self {
             ApiError::ValidationError(msg) => {
@@ -108,20 +130,30 @@ impl ResponseError for ApiError {
                 let details = ProblemDetails::invalid_request("Resource not found", None);
                 HttpResponse::NotFound().json(details)
             }
-        }
-    }
-
-    fn status_code(&self) -> StatusCode {
-        match self {
-            ApiError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            ApiError::DatabaseError(msg) => {
-                if msg == "Puzzle not generated yet" {
-                    StatusCode::SERVICE_UNAVAILABLE
-                } else {
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
+            ApiError::JwtError(msg) => {
+                tracing::warn!("JWT error: {msg}");
+                let details = ProblemDetails::new(
+                    "Unauthorized",
+                    StatusCode::UNAUTHORIZED,
+                    "Invalid or expired token",
+                    None,
+                );
+                HttpResponse::Unauthorized().json(details)
             }
-            ApiError::NotFound => StatusCode::NOT_FOUND,
+            ApiError::ExternalServiceError(msg) => {
+                tracing::error!("External service error: {msg}");
+                let details = ProblemDetails::internal_error(None);
+                HttpResponse::InternalServerError().json(details)
+            }
+            ApiError::Unauthorized => {
+                let details = ProblemDetails::new(
+                    "Unauthorized",
+                    StatusCode::UNAUTHORIZED,
+                    "Authentication required",
+                    None,
+                );
+                HttpResponse::Unauthorized().json(details)
+            }
         }
     }
 }

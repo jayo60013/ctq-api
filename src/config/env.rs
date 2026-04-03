@@ -1,16 +1,21 @@
 use chrono::NaiveDate;
-use serde::Deserialize;
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct Config {
+#[derive(Debug, Clone)]
+pub struct EnvConfig {
     pub database_url: String,
     pub start_date: NaiveDate,
     pub debug: bool,
     pub allowed_origins: Vec<String>,
     pub port: u16,
+    pub google_client_id: String,
+    pub google_client_secret: String,
+    pub google_redirect_uri: String,
+    pub jwt_secret: String,
+    pub cookie_domain: Option<String>,
+    pub secure_cookies: bool,
 }
 
-impl Config {
+impl EnvConfig {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
         dotenvy::dotenv().ok();
 
@@ -35,12 +40,31 @@ impl Config {
             .and_then(|p| p.parse().ok())
             .unwrap_or(9100);
 
-        Ok(Config {
+        let google_client_id = std::env::var("GOOGLE_CLIENT_ID")?;
+        let google_client_secret = std::env::var("GOOGLE_CLIENT_SECRET")?;
+        let google_redirect_uri = std::env::var("GOOGLE_REDIRECT_URI")
+            .unwrap_or_else(|_| "http://localhost:9100/auth/google/callback".to_string());
+
+        let jwt_secret = std::env::var("JWT_SECRET")?;
+
+        let cookie_domain = std::env::var("COOKIE_DOMAIN").ok();
+
+        let secure_cookies = std::env::var("SECURE_COOKIES")
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(true);
+
+        Ok(EnvConfig {
             database_url,
             start_date,
             debug,
             allowed_origins,
             port,
+            google_client_id,
+            google_client_secret,
+            google_redirect_uri,
+            jwt_secret,
+            cookie_domain,
+            secure_cookies,
         })
     }
 }

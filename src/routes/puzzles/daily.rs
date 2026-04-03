@@ -1,37 +1,27 @@
-use actix_web::{HttpResponse, get, post, web};
-use chrono::Local;
+use actix_web::{get, post, web, HttpResponse};
 use sqlx::PgPool;
 use validator::Validate;
 
 use crate::{
-    config::Config,
-    db::PuzzleRepository,
+    config::EnvConfig,
     error::ApiError,
     models::{
         CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse,
         PuzzleResponse, SolveLetterRequest, SolveLetterResponse,
     },
+    puzzle_cache::DailyPuzzleCache,
+    repository::PuzzleRepository,
     services::PuzzleService,
-    transformer::parse_cipher_map_from_json,
 };
 
-// GET /puzzles/{id}
-#[get("/{id}")]
-async fn get_puzzle(
+#[get("/daily")]
+async fn get_daily_puzzle(
     pool: web::Data<PgPool>,
-    config: web::Data<Config>,
-    id: web::Path<i32>,
+    config: web::Data<EnvConfig>,
+    cache: web::Data<DailyPuzzleCache>,
 ) -> Result<HttpResponse, ApiError> {
-    let puzzle_id = *id;
-
-    // Check if puzzle is in the future
-    let puzzle_date = config.start_date + chrono::Duration::days(i64::from(puzzle_id - 1));
-    if puzzle_date > Local::now().date_naive() {
-        return Err(ApiError::NotFound);
-    }
-
     let repo = PuzzleRepository::new(pool.get_ref().clone());
-    let puzzle = repo.get_by_id(puzzle_id).await?;
+    let puzzle = cache.get_puzzle(&repo, &config).await?;
 
     let response = PuzzleResponse {
         id: puzzle.id,
@@ -44,22 +34,21 @@ async fn get_puzzle(
     Ok(HttpResponse::Ok().json(response))
 }
 
-// POST /puzzles/{id}/check-letter
-#[post("/{id}/check-letter")]
-async fn check_letter(
+#[post("/daily/check-letter")]
+async fn check_daily_letter(
     pool: web::Data<PgPool>,
-    id: web::Path<i32>,
+    config: web::Data<EnvConfig>,
+    cache: web::Data<DailyPuzzleCache>,
     req: web::Json<CheckLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
     req.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
-    let puzzle = repo.get_by_id(*id).await?;
-    let cipher_map = parse_cipher_map_from_json(&puzzle.cipher_map)?;
+    let puzzle = cache.get_puzzle(&repo, &config).await?;
 
     let is_correct =
-        PuzzleService::check_letter(req.cipher_letter, req.letter_to_check, &cipher_map);
+        PuzzleService::check_letter(req.cipher_letter, req.letter_to_check, &puzzle.cipher_map);
 
     let response = CheckLetterResponse {
         is_letter_correct: is_correct,
@@ -67,41 +56,39 @@ async fn check_letter(
     Ok(HttpResponse::Ok().json(response))
 }
 
-// POST /puzzles/{id}/solve-letter
-#[post("/{id}/solve-letter")]
-async fn solve_letter(
+#[post("/daily/solve-letter")]
+async fn solve_daily_letter(
     pool: web::Data<PgPool>,
-    id: web::Path<i32>,
+    config: web::Data<EnvConfig>,
+    cache: web::Data<DailyPuzzleCache>,
     req: web::Json<SolveLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
     req.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
-    let puzzle = repo.get_by_id(*id).await?;
-    let cipher_map = parse_cipher_map_from_json(&puzzle.cipher_map)?;
+    let puzzle = cache.get_puzzle(&repo, &config).await?;
 
-    let correct_letter = PuzzleService::solve_letter(req.cipher_letter, &cipher_map)?;
+    let correct_letter = PuzzleService::solve_letter(req.cipher_letter, &puzzle.cipher_map)?;
 
     let response = SolveLetterResponse { correct_letter };
     Ok(HttpResponse::Ok().json(response))
 }
 
-// POST /puzzles/{id}/check-quote
-#[post("/{id}/check-quote")]
-async fn check_quote(
+#[post("/daily/check-quote")]
+async fn check_daily_quote(
     pool: web::Data<PgPool>,
-    id: web::Path<i32>,
+    config: web::Data<EnvConfig>,
+    cache: web::Data<DailyPuzzleCache>,
     req: web::Json<CheckQuoteRequest>,
 ) -> Result<HttpResponse, ApiError> {
     req.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
-    let puzzle = repo.get_by_id(*id).await?;
-    let cipher_map = parse_cipher_map_from_json(&puzzle.cipher_map)?;
+    let puzzle = cache.get_puzzle(&repo, &config).await?;
 
-    let is_correct = PuzzleService::check_quote(&req.cipher_map, &cipher_map);
+    let is_correct = PuzzleService::check_quote(&req.cipher_map, &puzzle.cipher_map);
 
     let response = CheckQuoteResponse {
         is_quote_correct: is_correct,
@@ -110,8 +97,8 @@ async fn check_quote(
 }
 
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_puzzle)
-        .service(check_letter)
-        .service(solve_letter)
-        .service(check_quote);
+    cfg.service(get_daily_puzzle)
+        .service(check_daily_letter)
+        .service(solve_daily_letter)
+        .service(check_daily_quote);
 }

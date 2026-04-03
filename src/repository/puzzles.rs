@@ -1,8 +1,12 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use std::collections::HashMap;
 
-use crate::{error::ApiError, models::puzzle_row::PuzzleRow, models::quote_row::QuoteRow};
+use crate::error::ApiError;
+use crate::models::puzzle_row::PuzzleRow;
+use crate::models::quote_row::QuoteRow;
+use crate::transformer::parse_cipher_map_from_json;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Puzzle {
@@ -12,7 +16,7 @@ pub struct Puzzle {
     pub encoded_quote: String,
     pub author: String,
     pub source: Option<String>,
-    pub cipher_map: serde_json::Value,
+    pub cipher_map: HashMap<char, char>,
 }
 
 pub struct PuzzleRepository {
@@ -48,7 +52,7 @@ impl PuzzleRepository {
             encoded_quote: puzzle_row.encoded_quote,
             author: quote_row.author,
             source: quote_row.source,
-            cipher_map: puzzle_row.cipher_map,
+            cipher_map: parse_cipher_map_from_json(&puzzle_row.cipher_map)?,
         })
     }
 }

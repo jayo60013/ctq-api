@@ -1,24 +1,25 @@
 mod config;
-mod db;
 mod error;
 mod health;
+mod middleware;
 mod models;
 mod puzzle_cache;
+mod repository;
 mod routes;
 mod services;
 mod transformer;
 mod validators;
 
-use actix_cors::Cors;
-use actix_web::{App, HttpServer, middleware::Logger, web};
+use actix_web::{middleware::Logger, web, App, HttpServer};
 use sqlx::postgres::PgPoolOptions;
 
-use config::Config;
+use config::EnvConfig;
+use middleware::create_cors;
 use puzzle_cache::DailyPuzzleCache;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let config = Config::from_env().expect("Failed to load configuration");
+    let config = EnvConfig::from_env().expect("Failed to load configuration");
 
     let log_level = if config.debug { "debug" } else { "info" };
     tracing_subscriber::fmt()
@@ -50,26 +51,18 @@ async fn main() -> std::io::Result<()> {
 
     let pool = web::Data::new(pool);
     let daily_puzzle_cache = web::Data::new(DailyPuzzleCache::new());
+    let config_data = web::Data::new(config.clone());
     let server_port = config.port;
 
     tracing::info!("Starting HTTP server on 0.0.0.0:{}", server_port);
 
     HttpServer::new(move || {
         let allowed_origins = config.allowed_origins.clone();
-        let config_data = web::Data::new(config.clone());
-        let cors = Cors::default()
-            .allowed_origin_fn(move |origin, _req_head| {
-                allowed_origins
-                    .iter()
-                    .any(|allowed| origin.as_bytes().eq_ignore_ascii_case(allowed.as_bytes()))
-            })
-            .allow_any_method()
-            .allow_any_header()
-            .max_age(3600);
+        let cors = create_cors(&allowed_origins);
 
         App::new()
             .app_data(pool.clone())
-            .app_data(config_data)
+            .app_data(config_data.clone())
             .app_data(daily_puzzle_cache.clone())
             .wrap(cors)
             .wrap(Logger::default())

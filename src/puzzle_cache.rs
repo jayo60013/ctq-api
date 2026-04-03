@@ -3,10 +3,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
-    config::Config,
-    db::{Puzzle, PuzzleRepository},
+    config::EnvConfig,
     error::ApiError,
-    models::PuzzleResponse,
+    repository::{Puzzle, PuzzleRepository},
 };
 
 pub struct DailyPuzzleCache {
@@ -22,7 +21,6 @@ impl Default for DailyPuzzleCache {
 
 #[derive(Clone)]
 struct CachedPuzzle {
-    response: PuzzleResponse,
     full_puzzle: Puzzle,
     date: NaiveDate,
 }
@@ -35,25 +33,10 @@ impl DailyPuzzleCache {
         }
     }
 
-    pub async fn get_response(
-        &self,
-        pool_repo: &PuzzleRepository,
-        config: &Config,
-    ) -> Result<PuzzleResponse, ApiError> {
-        self.ensure_cached(pool_repo, config).await?;
-
-        let cached = self.response.read().await;
-        Ok(cached
-            .as_ref()
-            .expect("Cache should be populated")
-            .response
-            .clone())
-    }
-
     pub async fn get_puzzle(
         &self,
         pool_repo: &PuzzleRepository,
-        config: &Config,
+        config: &EnvConfig,
     ) -> Result<Puzzle, ApiError> {
         self.ensure_cached(pool_repo, config).await?;
 
@@ -68,7 +51,7 @@ impl DailyPuzzleCache {
     async fn ensure_cached(
         &self,
         pool_repo: &PuzzleRepository,
-        config: &Config,
+        config: &EnvConfig,
     ) -> Result<(), ApiError> {
         let today = Local::now().date_naive();
         let mut last_date = self.last_date.write().await;
@@ -82,10 +65,10 @@ impl DailyPuzzleCache {
 
         {
             let response = self.response.read().await;
-            if let Some(cached) = response.as_ref()
-                && cached.date == today
-            {
-                return Ok(());
+            if let Some(cached) = response.as_ref() {
+                if cached.date == today {
+                    return Ok(());
+                }
             }
         }
 
@@ -100,18 +83,9 @@ impl DailyPuzzleCache {
                 other => other,
             })?;
 
-        let response = PuzzleResponse {
-            id: db_puzzle.id,
-            encoded_quote: db_puzzle.encoded_quote.clone(),
-            author: db_puzzle.author.clone(),
-            source: db_puzzle.source.clone(),
-            date: db_puzzle.daily_date,
-        };
-
         {
             let mut cached = self.response.write().await;
             *cached = Some(CachedPuzzle {
-                response,
                 full_puzzle: db_puzzle,
                 date: today,
             });
@@ -121,7 +95,7 @@ impl DailyPuzzleCache {
     }
 
     #[allow(clippy::cast_possible_truncation)]
-    fn calculate_puzzle_id(date: NaiveDate, config: &Config) -> i32 {
+    fn calculate_puzzle_id(date: NaiveDate, config: &EnvConfig) -> i32 {
         let days_since_start = (date - config.start_date).num_days();
         (days_since_start + 1) as i32
     }
