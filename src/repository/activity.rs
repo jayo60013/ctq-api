@@ -1,8 +1,10 @@
 use sqlx::PgPool;
 use uuid::Uuid;
+use chrono::NaiveDate;
 
 use crate::error::ApiError;
 use crate::models::ActivityRow;
+use crate::config::EnvConfig;
 
 pub async fn upsert_activity(
     pool: &PgPool,
@@ -80,4 +82,35 @@ pub async fn get_activity(
     .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
     Ok(activity)
+}
+
+pub async fn get_activities_by_date_range(
+    pool: &PgPool,
+    config: &EnvConfig,
+    user_id: Uuid,
+    from_date: NaiveDate,
+    to_date: NaiveDate,
+) -> Result<Vec<ActivityRow>, ApiError> {
+    let days_from_start = i32::try_from((from_date - config.start_date).num_days()).unwrap();
+    let days_to_start = i32::try_from((to_date - config.start_date).num_days()).unwrap();
+
+    let from_puzzle_id = days_from_start + 1;
+    let to_puzzle_id = days_to_start + 1;
+
+    let activities = sqlx::query_as::<_, ActivityRow>(
+        r"
+        SELECT user_id, puzzle_id, completed_at, attempts, checks_used, solves_used, is_solved, is_daily_flag, current_streak
+        FROM activities
+        WHERE user_id = $1 AND puzzle_id >= $2 AND puzzle_id <= $3
+        ORDER BY puzzle_id ASC
+        "
+    )
+    .bind(user_id)
+    .bind(from_puzzle_id)
+    .bind(to_puzzle_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+    Ok(activities)
 }

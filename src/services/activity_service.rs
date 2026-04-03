@@ -1,12 +1,12 @@
 use chrono::Local;
+use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::config::EnvConfig;
 use crate::error::ApiError;
-use crate::models::{ActivityRow, ActivityUpdateRequest};
-use crate::repository::get_activity;
-use crate::repository::upsert_activity;
+use crate::models::{ActivityRow, ActivityRowDto, ActivityUpdateRequest};
+use crate::repository::{get_activities_by_date_range, get_activity, upsert_activity};
 use crate::validators::validate_activity_request;
 
 pub struct ActivityService;
@@ -47,5 +47,22 @@ impl ActivityService {
         let today = Local::now().date_naive();
         let days_since_start = (today - config.start_date).num_days();
         i32::try_from(days_since_start + 1).unwrap()
+    }
+
+    pub async fn fetch_activity_summary(
+        pool: &PgPool,
+        config: &EnvConfig,
+        user_id: Uuid,
+        from_date: NaiveDate,
+        to_date: NaiveDate,
+    ) -> Result<Vec<ActivityRowDto>, ApiError> {
+        let activities = get_activities_by_date_range(pool, config, user_id, from_date, to_date).await?;
+
+        let response = activities
+            .into_iter()
+            .map(ActivityRowDto::from)
+            .collect();
+
+        Ok(response)
     }
 }
