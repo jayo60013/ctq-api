@@ -1,6 +1,6 @@
 FROM rust:1.94-alpine AS builder
 
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache build-base musl-dev
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ COPY src ./src
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM rust:1.94-alpine AS cacher
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache build-base musl-dev
 WORKDIR /app
 
 RUN cargo install cargo-chef
@@ -22,7 +22,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 # ---------- BUILD APP ----------
 FROM rust:1.94-alpine AS builder-final
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache build-base musl-dev
 WORKDIR /app
 
 COPY . .
