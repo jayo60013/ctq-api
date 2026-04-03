@@ -55,27 +55,27 @@ impl GoogleOAuthService {
     ) -> Result<String, ApiError> {
         let client = reqwest::Client::new();
 
-        let params = [
-            ("client_id", self.client_id.as_str()),
-            ("client_secret", self.client_secret.as_str()),
-            ("code", code),
-            ("code_verifier", code_verifier),
-            ("grant_type", "authorization_code"),
-            ("redirect_uri", self.redirect_uri.as_str()),
-        ];
+        let body = format!(
+            "client_id={}&client_secret={}&code={}&code_verifier={}&grant_type=authorization_code&redirect_uri={}",
+            urlencoding::encode(&self.client_id),
+            urlencoding::encode(&self.client_secret),
+            urlencoding::encode(code),
+            urlencoding::encode(code_verifier),
+            urlencoding::encode(&self.redirect_uri),
+        );
 
         let response = client
             .post("https://oauth2.googleapis.com/token")
-            .form(&params)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
             .send()
             .await
-            .map_err(|e| {
-                ApiError::ExternalServiceError(format!("Google token request failed: {e}"))
-            })?;
+            .map_err(|e| ApiError::ExternalServiceError(format!("Google token request failed: {e}")))?;
 
-        let token_response: GoogleTokenResponse = response.json().await.map_err(|e| {
-            ApiError::ExternalServiceError(format!("Failed to parse token response: {e}"))
-        })?;
+        let token_response: GoogleTokenResponse = response
+            .json()
+            .await
+            .map_err(|e| ApiError::ExternalServiceError(format!("Failed to parse token response: {e}")))?;
 
         Ok(token_response.id_token)
     }
