@@ -19,7 +19,7 @@ concurrency:
 
 env:
   REGISTRY: gitea.umbra.mom
-  IMAGE_NAME: ctq-puzzle-generator
+  IMAGE_NAME: ctq-api
 
 jobs:
   build-and-push:
