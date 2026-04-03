@@ -1,6 +1,6 @@
 pub mod auth;
-pub mod puzzles;
 pub mod me;
+pub mod puzzles;
 
 use actix_web::web;
 

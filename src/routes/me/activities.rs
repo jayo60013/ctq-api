@@ -40,5 +40,3 @@ async fn get_activity_summary(
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(get_activity_summary);
 }
-
-

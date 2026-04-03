@@ -56,12 +56,10 @@ impl ActivityService {
         from_date: NaiveDate,
         to_date: NaiveDate,
     ) -> Result<Vec<ActivityRowDto>, ApiError> {
-        let activities = get_activities_by_date_range(pool, config, user_id, from_date, to_date).await?;
+        let activities =
+            get_activities_by_date_range(pool, config, user_id, from_date, to_date).await?;
 
-        let response = activities
-            .into_iter()
-            .map(ActivityRowDto::from)
-            .collect();
+        let response = activities.into_iter().map(ActivityRowDto::from).collect();
 
         Ok(response)
     }

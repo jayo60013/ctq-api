@@ -1,6 +1,6 @@
 pub mod activity_validator;
-pub mod puzzle_validator;
 pub mod date_range;
+pub mod puzzle_validator;
 
 pub use activity_validator::validate_activity_request;
 pub use date_range::DateRange;

@@ -1,10 +1,10 @@
+use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
-use chrono::NaiveDate;
 
+use crate::config::EnvConfig;
 use crate::error::ApiError;
 use crate::models::ActivityRow;
-use crate::config::EnvConfig;
 
 pub async fn upsert_activity(
     pool: &PgPool,
