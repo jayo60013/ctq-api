@@ -2,6 +2,89 @@
 
 A RESTful API for the Crack the Quote word puzzle game. Users can solve daily puzzles or access archived puzzles by ID.
 
+Authentication is handled via **server-managed OAuth2 with secure HttpOnly cookies**, ensuring tokens are never exposed to JavaScript.
+
+---
+
+## Authentication
+
+### Overview
+
+This API uses **Google OAuth2 Authorization Code Flow + PKCE** for authentication:
+
+1. Frontend calls `GET /auth/google/url` to get the authorization URL
+2. User is redirected to Google's login page
+3. After login, Google redirects back to the frontend with an authorization code
+4. Frontend calls `GET /auth/google/callback?code=...&state=...&code_verifier=...`
+5. Backend exchanges the code for an ID token, verifies it, and issues an `auth_token` cookie
+6. All subsequent requests include this cookie automatically
+
+The `auth_token` is a **JWT signed with the server's secret**, stored in an **HttpOnly, Secure cookie** that JavaScript cannot access.
+
+### Authentication Endpoints
+
+#### `GET /auth/google/url`
+
+Initiates OAuth2 flow by returning the authorization URL and PKCE parameters.
+
+**Response (200 OK):**
+```json
+{
+  "url": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "state": "<random-uuid>",
+  "code_verifier": "<128-char-pkce-verifier>"
+}
+```
+
+**Frontend responsibilities:**
+- Store `state` and `code_verifier` in `sessionStorage`
+- Redirect user to the `url`
+- After redirect back, retrieve these values and send them to `/auth/google/callback`
+
+---
+
+#### `GET /auth/google/callback`
+
+OAuth2 callback handler. Processes authorization response from Google, validates PKCE, and issues session cookie.
+
+**Query Parameters:**
+- `code`: Authorization code from Google
+- `state`: CSRF token (must match the value from `/auth/google/url`)
+- `code_verifier`: PKCE verifier (must match the code challenge sent to Google)
+
+**Response (200 OK):**
+```json
+{
+  "userId": "<uuid>",
+  "email": "user@example.com"
+}
+```
+
+**Cookie Set:**
+- `auth_token`: JWT session token
+  - HttpOnly: true (not readable by JavaScript)
+  - Secure: true (only sent over HTTPS in production)
+  - SameSite: Lax
+  - Path: /
+  - Max-Age: 86400 seconds (24 hours)
+
+**Errors:**
+- `400 Bad Request`: Missing or invalid query parameters
+- `500 Internal Server Error`: OAuth provider error or token validation failure
+
+---
+
+#### `POST /auth/logout`
+
+Clears the session by removing the auth_token cookie.
+
+**Response (200 OK):**
+```json
+{
+  "message": "Logged out"
+}
+```
+
 ---
 
 ## API Endpoints
@@ -148,13 +231,17 @@ Verify API is running
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | Required | PostgreSQL connection string |
-| `START_DATE` | `2026-01-01` | Puzzle series start date (YYYY-MM-DD) |
-| `PORT` | `8000` | HTTP server port |
-| `DEBUG` | `false` | Enable debug logging |
-| `ALLOWED_ORIGINS` | `http://localhost:3000` | CORS allowed origins (comma-separated) |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `GOOGLE_CLIENT_ID` | Yes | — | OAuth client ID from [Google Console](https://console.cloud.google.com) |
+| `GOOGLE_CLIENT_SECRET` | Yes | — | OAuth client secret from Google Console |
+| `JWT_SECRET` | Yes | — | Secret key for signing session JWTs (use a random 32+ character string) |
+| `START_DATE` | No | `2026-01-01` | Puzzle series start date (YYYY-MM-DD) |
+| `DEBUG` | No | `false` | Enable debug logging |
+| `ALLOWED_ORIGINS` | No | `http://localhost:3000` | CORS allowed origins (comma-separated) |
+| `GOOGLE_REDIRECT_URI` | No | `http://localhost:3000/auth/callback` | OAuth redirect URI (must match Google Console exactly) |
+| `SECURE_COOKIES` | No | `true` | Use Secure flag for cookies (set to `false` only for local dev without HTTPS) |
 
 ---
 

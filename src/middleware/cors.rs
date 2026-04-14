@@ -11,14 +11,9 @@ pub fn create_cors(allowed_origins: &[String]) -> Cors {
     cors.allowed_methods(vec![
         http::Method::GET,
         http::Method::POST,
-        http::Method::PUT,
-        http::Method::DELETE,
         http::Method::OPTIONS,
     ])
-    .allowed_headers(vec![
-        http::header::CONTENT_TYPE,
-        http::header::AUTHORIZATION,
-    ])
+    .allowed_headers(vec![http::header::CONTENT_TYPE])
     .supports_credentials()
     .max_age(3600)
 }

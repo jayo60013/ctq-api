@@ -18,6 +18,7 @@ pub struct AuthUrlResponse {
     pub code_verifier: String,
 }
 
+// GET /auth/google/url
 #[get("/google/url")]
 async fn get_google_auth_url(config: web::Data<EnvConfig>) -> Result<HttpResponse, ApiError> {
     let (code_verifier, code_challenge) = GoogleOAuthService::generate_pkce_pair();
@@ -40,6 +41,7 @@ async fn get_google_auth_url(config: web::Data<EnvConfig>) -> Result<HttpRespons
     Ok(HttpResponse::Ok().json(response))
 }
 
+// GET /auth/google/callback
 #[get("/google/callback")]
 async fn google_callback(
     pool: web::Data<PgPool>,
@@ -51,7 +53,7 @@ async fn google_callback(
         .and_then(|v| v.as_str())
         .ok_or_else(|| ApiError::ValidationError("Missing code parameter".to_string()))?;
 
-    let _state = query
+    let state = query
         .get("state")
         .and_then(|v| v.as_str())
         .ok_or_else(|| ApiError::ValidationError("Missing state parameter".to_string()))?;
@@ -60,6 +62,12 @@ async fn google_callback(
         .get("code_verifier")
         .and_then(|v| v.as_str())
         .ok_or_else(|| ApiError::ValidationError("Missing code_verifier in query".to_string()))?;
+
+    if state.is_empty() || code_verifier.is_empty() {
+        return Err(ApiError::ValidationError(
+            "State and code_verifier must not be empty".to_string(),
+        ));
+    }
 
     let oauth_service = GoogleOAuthService::new(
         config.google_client_id.clone(),
