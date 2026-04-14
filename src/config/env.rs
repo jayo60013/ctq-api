@@ -43,7 +43,7 @@ impl EnvConfig {
         let google_client_id = std::env::var("GOOGLE_CLIENT_ID")?;
         let google_client_secret = std::env::var("GOOGLE_CLIENT_SECRET")?;
         let google_redirect_uri = std::env::var("GOOGLE_REDIRECT_URI")
-            .unwrap_or_else(|_| "http://localhost:9100/auth/google/callback".to_string());
+            .unwrap_or_else(|_| "http://localhost:3000/auth/callback".to_string());
 
         let jwt_secret = std::env::var("JWT_SECRET")?;
 
