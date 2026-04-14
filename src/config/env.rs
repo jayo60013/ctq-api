@@ -6,12 +6,10 @@ pub struct EnvConfig {
     pub start_date: NaiveDate,
     pub debug: bool,
     pub allowed_origins: Vec<String>,
-    pub port: u16,
     pub google_client_id: String,
     pub google_client_secret: String,
     pub google_redirect_uri: String,
     pub jwt_secret: String,
-    pub cookie_domain: Option<String>,
     pub secure_cookies: bool,
 }
 
@@ -35,19 +33,12 @@ impl EnvConfig {
             .map(|s| s.trim().to_string())
             .collect();
 
-        let port = std::env::var("PORT")
-            .ok()
-            .and_then(|p| p.parse().ok())
-            .unwrap_or(9100);
-
         let google_client_id = std::env::var("GOOGLE_CLIENT_ID")?;
         let google_client_secret = std::env::var("GOOGLE_CLIENT_SECRET")?;
         let google_redirect_uri = std::env::var("GOOGLE_REDIRECT_URI")
             .unwrap_or_else(|_| "http://localhost:3000/auth/callback".to_string());
 
         let jwt_secret = std::env::var("JWT_SECRET")?;
-
-        let cookie_domain = std::env::var("COOKIE_DOMAIN").ok();
 
         let secure_cookies = std::env::var("SECURE_COOKIES")
             .map(|v| v.to_lowercase() == "true")
@@ -58,12 +49,10 @@ impl EnvConfig {
             start_date,
             debug,
             allowed_origins,
-            port,
             google_client_id,
             google_client_secret,
             google_redirect_uri,
             jwt_secret,
-            cookie_domain,
             secure_cookies,
         })
     }

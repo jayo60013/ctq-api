@@ -96,7 +96,18 @@ impl GoogleOAuthService {
             ));
         }
 
-        let payload: GoogleIdTokenPayload = response.json().await.map_err(|e| {
+        let text = response.text().await.map_err(|e| {
+            ApiError::ExternalServiceError(format!("Failed to read response body: {e}"))
+        })?;
+
+        tracing::debug!("Google tokeninfo response: {}", text);
+
+        let payload: GoogleIdTokenPayload = serde_json::from_str(&text).map_err(|e| {
+            tracing::error!(
+                "Failed to parse token payload. Response body: {}. Error: {}",
+                text,
+                e
+            );
             ApiError::ExternalServiceError(format!("Failed to parse token payload: {e}"))
         })?;
 

@@ -52,7 +52,7 @@ async fn main() -> std::io::Result<()> {
     let pool = web::Data::new(pool);
     let daily_puzzle_cache = web::Data::new(DailyPuzzleCache::new());
     let config_data = web::Data::new(config.clone());
-    let server_port = config.port;
+    let server_port: u16 = 9100;
 
     tracing::info!("Starting HTTP server on 0.0.0.0:{}", server_port);
 

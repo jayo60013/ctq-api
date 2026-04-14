@@ -24,6 +24,12 @@ pub struct GoogleIdTokenPayload {
     pub aud: String,
     #[allow(dead_code)]
     pub exp: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub email_verified: Option<bool>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub iss: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

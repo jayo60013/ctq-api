@@ -99,10 +99,6 @@ async fn google_callback(
     cookie.set_secure(Some(config.secure_cookies));
     cookie.set_same_site(actix_web::cookie::SameSite::Lax);
 
-    if let Some(domain) = &config.cookie_domain {
-        cookie.set_domain(domain.clone());
-    }
-
     http_response
         .add_cookie(&cookie)
         .map_err(|_| ApiError::ExternalServiceError("Failed to set cookie".to_string()))?;
