@@ -111,7 +111,7 @@ impl GoogleOAuthService {
             ApiError::ExternalServiceError(format!("Failed to parse token payload: {e}"))
         })?;
 
-        if payload.aud != self.client_id {
+        if payload.audience != self.client_id {
             return Err(ApiError::ExternalServiceError(
                 "Invalid audience in token".to_string(),
             ));

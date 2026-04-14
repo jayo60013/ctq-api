@@ -17,19 +17,22 @@ pub struct GoogleTokenResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct GoogleIdTokenPayload {
-    pub sub: String,
+    pub user_id: String,
     pub email: String,
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub picture: Option<String>,
-    pub aud: String,
+    pub audience: String,
+    #[serde(default)]
     #[allow(dead_code)]
-    pub exp: i64,
+    pub expires_in: i64,
     #[serde(default)]
     #[allow(dead_code)]
     pub email_verified: Option<bool>,
     #[serde(default)]
     #[allow(dead_code)]
-    pub iss: Option<String>,
+    pub issuer: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

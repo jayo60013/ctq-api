@@ -76,7 +76,7 @@ async fn google_callback(
     let user_repo = UserRepository::new(pool.get_ref().clone());
     let user = user_repo
         .create_or_update(
-            &google_payload.sub,
+            &google_payload.user_id,
             &google_payload.email,
             google_payload.name.as_deref(),
             google_payload.picture.as_deref(),
