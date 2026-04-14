@@ -16,7 +16,7 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "fmt", "ansi"] }
 validator = { version = "0.20.0", features = ["derive"] }
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
-jsonwebtoken = "10.3.0"
+jsonwebtoken = { version = "10.3.0", features = ["use_pem"] }
 sha2 = "0.11.0"
 base64 = "0.22.1"
 rand = "0.8.5"
