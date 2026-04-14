@@ -27,6 +27,7 @@ pub struct GoogleIdTokenPayload {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AuthResponse {
     pub user_id: String,
     pub email: String,
