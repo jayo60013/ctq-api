@@ -174,3 +174,75 @@ pub async fn get_activities_by_date_range(
 
     Ok(activities)
 }
+
+pub async fn get_total_played_puzzles(pool: &PgPool, user_id: Uuid) -> Result<i64, ApiError> {
+    let count = sqlx::query_scalar::<_, i64>(
+        r"
+        SELECT COUNT(*) as total
+        FROM activities
+        WHERE user_id = $1
+        ",
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+    Ok(count)
+}
+
+pub async fn get_current_streak(pool: &PgPool, user_id: Uuid) -> Result<i32, ApiError> {
+    let streak = sqlx::query_scalar::<_, Option<i32>>(
+        r"
+        SELECT a.current_streak
+        FROM activities a
+        JOIN puzzles p ON a.puzzle_id = p.id
+        WHERE a.user_id = $1
+            AND a.is_daily_flag = true
+            AND a.is_solved = true
+        ORDER BY p.daily_date DESC
+        LIMIT 1
+        ",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+    Ok(streak.flatten().unwrap_or(0))
+}
+
+pub async fn get_highest_streak(pool: &PgPool, user_id: Uuid) -> Result<i32, ApiError> {
+    let streak = sqlx::query_scalar::<_, Option<i32>>(
+        r"
+        SELECT MAX(current_streak)
+        FROM activities
+        WHERE user_id = $1
+            AND is_daily_flag = true
+            AND is_solved = true
+        ",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+    Ok(streak.flatten().unwrap_or(0))
+}
+
+pub async fn get_average_attempts(pool: &PgPool, user_id: Uuid) -> Result<f64, ApiError> {
+    let avg = sqlx::query_scalar::<_, Option<f64>>(
+        r"
+        SELECT AVG(attempts)
+        FROM activities
+        WHERE user_id = $1
+            AND is_solved = true
+        ",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+    Ok(avg.flatten().unwrap_or(0.0))
+}

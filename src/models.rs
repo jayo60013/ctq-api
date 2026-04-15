@@ -7,6 +7,7 @@ pub mod puzzle_response;
 pub mod puzzle_row;
 pub mod quote_row;
 pub mod solve_letter;
+pub mod stats;
 pub mod user;
 
 pub use activity::{ActivityRow, ActivityRowDto, ActivityUpdateRequest};
@@ -16,4 +17,5 @@ pub use check_quote::{CheckQuoteRequest, CheckQuoteResponse};
 pub use problem_details::ProblemDetails;
 pub use puzzle_response::PuzzleResponse;
 pub use solve_letter::{SolveLetterRequest, SolveLetterResponse};
+pub use stats::StatsResponse;
 pub use user::{AuthenticatedUser, User, UserPayload};

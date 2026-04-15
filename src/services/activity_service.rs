@@ -3,8 +3,11 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::ApiError;
-use crate::models::{ActivityRow, ActivityRowDto, ActivityUpdateRequest};
-use crate::repository::{get_activities_by_date_range, get_activity, upsert_activity};
+use crate::models::{ActivityRow, ActivityRowDto, ActivityUpdateRequest, StatsResponse};
+use crate::repository::{
+    get_activities_by_date_range, get_activity, get_average_attempts, get_current_streak,
+    get_highest_streak, get_total_played_puzzles, upsert_activity,
+};
 
 pub struct ActivityService;
 
@@ -49,5 +52,19 @@ impl ActivityService {
         let response = activities.into_iter().map(ActivityRowDto::from).collect();
 
         Ok(response)
+    }
+
+    pub async fn get_stats(pool: &PgPool, user_id: Uuid) -> Result<StatsResponse, ApiError> {
+        let total_played_puzzles = get_total_played_puzzles(pool, user_id).await?;
+        let current_streak = get_current_streak(pool, user_id).await?;
+        let highest_streak = get_highest_streak(pool, user_id).await?;
+        let average_attempts = get_average_attempts(pool, user_id).await?;
+
+        Ok(StatsResponse {
+            total_played_puzzles,
+            current_streak,
+            highest_streak,
+            average_attempts,
+        })
     }
 }
