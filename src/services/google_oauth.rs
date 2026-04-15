@@ -126,7 +126,8 @@ impl GoogleOAuthService {
         // The tokeninfo endpoint doesn't return these fields, but the userinfo endpoint does
         if let Ok(userinfo) = self.get_userinfo(access_token).await {
             if payload.name.is_none() {
-                payload.name = userinfo.name;
+                // Prefer given_name over full name for display
+                payload.name = userinfo.given_name.or(userinfo.name);
             }
             if payload.picture.is_none() {
                 payload.picture = userinfo.picture;

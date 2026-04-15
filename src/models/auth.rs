@@ -45,14 +45,11 @@ pub struct AuthResponse {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct GoogleUserInfo {
-    pub id: String,
-    pub email: String,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
-    pub picture: Option<String>,
+    pub given_name: Option<String>,
     #[serde(default)]
-    pub verified_email: Option<bool>,
+    pub picture: Option<String>,
 }
