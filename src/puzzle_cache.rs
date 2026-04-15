@@ -1,4 +1,4 @@
-use chrono::{Local, NaiveDate};
+use chrono::{Utc, NaiveDate};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -29,7 +29,7 @@ impl DailyPuzzleCache {
     pub fn new() -> Self {
         Self {
             response: Arc::new(RwLock::new(None)),
-            last_date: Arc::new(RwLock::new(Local::now().date_naive())),
+            last_date: Arc::new(RwLock::new(Utc::now().date_naive())),
         }
     }
 
@@ -53,7 +53,7 @@ impl DailyPuzzleCache {
         pool_repo: &PuzzleRepository,
         config: &EnvConfig,
     ) -> Result<(), ApiError> {
-        let today = Local::now().date_naive();
+        let today = Utc::now().date_naive();
         let mut last_date = self.last_date.write().await;
 
         if today != *last_date {

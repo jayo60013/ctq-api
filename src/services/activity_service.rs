@@ -1,4 +1,4 @@
-use chrono::Local;
+use chrono::Utc;
 use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -44,7 +44,7 @@ impl ActivityService {
     }
 
     pub fn calculate_puzzle_id_for_daily(config: &EnvConfig) -> i32 {
-        let today = Local::now().date_naive();
+        let today = Utc::now().date_naive();
         let days_since_start = (today - config.start_date).num_days();
         i32::try_from(days_since_start + 1).unwrap()
     }
