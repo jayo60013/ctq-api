@@ -231,20 +231,20 @@ pub async fn get_highest_streak(pool: &PgPool, user_id: Uuid) -> Result<i32, Api
 }
 
 pub async fn get_average_attempts(pool: &PgPool, user_id: Uuid) -> Result<f64, ApiError> {
-    let avg = sqlx::query_scalar::<_, Option<f64>>(
+    let avg = sqlx::query_scalar::<_, f64>(
         r"
-        SELECT AVG(attempts)
+        SELECT COALESCE(AVG(attempts)::FLOAT8, 0)
         FROM activities
         WHERE user_id = $1
             AND is_solved = true
         ",
     )
     .bind(user_id)
-    .fetch_optional(pool)
+    .fetch_one(pool)
     .await
     .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-    Ok(avg.flatten().unwrap_or(0.0))
+    Ok(avg)
 }
 
 pub async fn is_puzzle_solved(
