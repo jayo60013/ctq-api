@@ -112,8 +112,7 @@ async fn check_daily_quote(
             true,
             &activity_req,
         )
-        .await
-        .unwrap_or(0);
+        .await?;
 
         streak = Some(current_streak);
     }

@@ -18,8 +18,6 @@ impl ActivityService {
         is_daily_flag: bool,
         activity_request: &ActivityUpdateRequest,
     ) -> Result<i32, ApiError> {
-        validate_activity_request(activity_request)?;
-
         upsert_activity(
             pool,
             user_id,
