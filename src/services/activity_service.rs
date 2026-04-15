@@ -5,7 +5,6 @@ use uuid::Uuid;
 use crate::error::ApiError;
 use crate::models::{ActivityRow, ActivityRowDto, ActivityUpdateRequest};
 use crate::repository::{get_activities_by_date_range, get_activity, upsert_activity};
-use crate::validators::validate_activity_request;
 
 pub struct ActivityService;
 
