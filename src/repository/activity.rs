@@ -17,7 +17,7 @@ pub async fn upsert_activity(
     let current_streak = if is_daily_flag && is_solved {
         let yesterday_date = sqlx::query_scalar::<_, Option<NaiveDate>>(
             r"
-            SELECT MAX(p.daily_date)
+            SELECT p.daily_date
             FROM activities a
             JOIN puzzles p ON a.puzzle_id = p.id
             WHERE a.user_id = $1
@@ -30,8 +30,7 @@ pub async fn upsert_activity(
         .bind(puzzle_id)
         .fetch_optional(pool)
         .await
-        .map_err(|e| ApiError::DatabaseError(e.to_string()))?
-        .flatten();
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
         if let Some(yesterday) = yesterday_date {
             let yesterday_streak = sqlx::query_scalar::<_, i32>(
