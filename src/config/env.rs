@@ -1,5 +1,3 @@
-use chrono::NaiveDate;
-
 #[derive(Debug, Clone)]
 pub struct EnvConfig {
     pub database_url: String,
