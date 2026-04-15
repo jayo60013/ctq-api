@@ -1,5 +1,5 @@
-use chrono::Utc;
 use chrono::NaiveDate;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 

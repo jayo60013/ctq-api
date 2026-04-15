@@ -1,4 +1,4 @@
-use chrono::{Utc, NaiveDate};
+use chrono::{NaiveDate, Utc};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
