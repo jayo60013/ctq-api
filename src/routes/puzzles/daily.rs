@@ -7,12 +7,13 @@ use crate::{
     config::EnvConfig,
     error::ApiError,
     middleware::extract_authenticated_user,
+    models::PuzzleState,
     models::{
         ActivityUpdateRequest, CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest,
         CheckQuoteResponse, PuzzleResponse, SolveLetterRequest, SolveLetterResponse,
     },
     puzzle_cache::DailyPuzzleCache,
-    repository::PuzzleRepository,
+    repository::{is_puzzle_solved, PuzzleRepository},
     services::{JwtService, PuzzleService},
     validators,
 };
@@ -20,10 +21,38 @@ use crate::{
 #[get("/daily")]
 async fn get_daily_puzzle(
     pool: web::Data<PgPool>,
+    config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, ApiError> {
     let repo = PuzzleRepository::new(pool.get_ref().clone());
     let puzzle = cache.get_puzzle(&repo).await?;
+
+    let state =
+        if let Ok(user) = extract_authenticated_user(&req, &JwtService::new(&config.jwt_secret)) {
+            let is_solved = is_puzzle_solved(pool.get_ref(), user.id, puzzle.id)
+                .await
+                .unwrap_or(false);
+
+            if is_solved {
+                // Get activity data
+                if let Ok(Some(activity)) =
+                    crate::repository::get_activity(pool.get_ref(), user.id, puzzle.id).await
+                {
+                    PuzzleState::solved(
+                        puzzle.quote.clone(),
+                        activity.checks_used,
+                        activity.solves_used,
+                    )
+                } else {
+                    PuzzleState::not_solved()
+                }
+            } else {
+                PuzzleState::not_solved()
+            }
+        } else {
+            PuzzleState::not_solved()
+        };
 
     let response = PuzzleResponse {
         id: puzzle.id,
@@ -31,6 +60,7 @@ async fn get_daily_puzzle(
         author: puzzle.author,
         source: puzzle.source,
         date: puzzle.daily_date,
+        state,
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -96,15 +126,13 @@ async fn check_daily_quote(
 
     let is_correct = PuzzleService::check_quote(&req.cipher_map, &puzzle.cipher_map);
 
-    let mut streak = None;
-
     let jwt_service = JwtService::new(&config.jwt_secret);
     if let Ok(user) = extract_authenticated_user(&http_req, &jwt_service) {
         let activity_req = ActivityUpdateRequest {
             checks_used: req.checks_used,
             solves_used: req.solves_used,
         };
-        let current_streak = ActivityService::track_activity(
+        let _ = ActivityService::track_activity(
             pool.get_ref(),
             user.id,
             puzzle.id,
@@ -113,13 +141,10 @@ async fn check_daily_quote(
             &activity_req,
         )
         .await?;
-
-        streak = Some(current_streak);
     }
 
     let response = CheckQuoteResponse {
         is_quote_correct: is_correct,
-        streak,
     };
     Ok(HttpResponse::Ok().json(response))
 }

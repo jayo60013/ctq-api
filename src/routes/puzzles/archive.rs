@@ -10,9 +10,9 @@ use crate::{
     middleware,
     models::{
         ActivityUpdateRequest, CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest,
-        CheckQuoteResponse, SolveLetterRequest, SolveLetterResponse,
+        CheckQuoteResponse, PuzzleState, SolveLetterRequest, SolveLetterResponse,
     },
-    repository::PuzzleRepository,
+    repository::{is_puzzle_solved, PuzzleRepository},
     services::{JwtService, PuzzleService},
     validators,
 };
@@ -25,11 +25,32 @@ async fn get_puzzle(
     req: HttpRequest,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
-    let _user = middleware::extract_authenticated_user(&req, &jwt_service)?;
+    let user = middleware::extract_authenticated_user(&req, &jwt_service)?;
 
     let puzzle_id = *id;
     let repo = PuzzleRepository::new(pool.get_ref().clone());
     let puzzle = repo.get_by_id(puzzle_id).await?;
+
+    let is_solved = is_puzzle_solved(pool.get_ref(), user.id, puzzle_id)
+        .await
+        .unwrap_or(false);
+
+    let state = if is_solved {
+        // Get activity data
+        if let Ok(Some(activity)) =
+            crate::repository::get_activity(pool.get_ref(), user.id, puzzle_id).await
+        {
+            PuzzleState::solved(
+                puzzle.quote.clone(),
+                activity.checks_used,
+                activity.solves_used,
+            )
+        } else {
+            PuzzleState::not_solved()
+        }
+    } else {
+        PuzzleState::not_solved()
+    };
 
     let response = PuzzleResponse {
         id: puzzle.id,
@@ -37,6 +58,7 @@ async fn get_puzzle(
         author: puzzle.author,
         source: puzzle.source,
         date: puzzle.daily_date,
+        state,
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -131,7 +153,6 @@ async fn check_quote(
 
     let response = CheckQuoteResponse {
         is_quote_correct: is_correct,
-        streak: None,
     };
     Ok(HttpResponse::Ok().json(response))
 }

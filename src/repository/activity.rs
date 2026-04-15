@@ -246,3 +246,25 @@ pub async fn get_average_attempts(pool: &PgPool, user_id: Uuid) -> Result<f64, A
 
     Ok(avg.flatten().unwrap_or(0.0))
 }
+
+pub async fn is_puzzle_solved(
+    pool: &PgPool,
+    user_id: Uuid,
+    puzzle_id: Uuid,
+) -> Result<bool, ApiError> {
+    let is_solved = sqlx::query_scalar::<_, bool>(
+        r"
+        SELECT is_solved
+        FROM activities
+        WHERE user_id = $1
+            AND puzzle_id = $2
+        ",
+    )
+    .bind(user_id)
+    .bind(puzzle_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+    Ok(is_solved.unwrap_or(false))
+}

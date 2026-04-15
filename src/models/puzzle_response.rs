@@ -2,6 +2,8 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::PuzzleState;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PuzzleResponse {
@@ -10,4 +12,5 @@ pub struct PuzzleResponse {
     pub author: String,
     pub source: Option<String>,
     pub date: NaiveDate,
+    pub state: PuzzleState,
 }

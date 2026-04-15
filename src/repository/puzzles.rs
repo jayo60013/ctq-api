@@ -18,6 +18,7 @@ pub struct Puzzle {
     pub author: String,
     pub source: Option<String>,
     pub cipher_map: HashMap<char, char>,
+    pub quote: String,
 }
 
 pub struct PuzzleRepository {
@@ -44,7 +45,7 @@ impl PuzzleRepository {
         .ok_or(ApiError::NotFound)?;
 
         let quote_row =
-            sqlx::query_as::<_, QuoteRow>("SELECT author, source FROM quotes WHERE id = $1")
+            sqlx::query_as::<_, QuoteRow>("SELECT author, source, quote FROM quotes WHERE id = $1")
                 .bind(puzzle_row.quote_id)
                 .fetch_one(&self.pool)
                 .await
@@ -58,6 +59,7 @@ impl PuzzleRepository {
             author: quote_row.author,
             source: quote_row.source,
             cipher_map: parse_cipher_map_from_json(&puzzle_row.cipher_map)?,
+            quote: quote_row.quote,
         })
     }
 
@@ -76,7 +78,7 @@ impl PuzzleRepository {
         .ok_or(ApiError::NotFound)?;
 
         let quote_row =
-            sqlx::query_as::<_, QuoteRow>("SELECT author, source FROM quotes WHERE id = $1")
+            sqlx::query_as::<_, QuoteRow>("SELECT author, source, quote FROM quotes WHERE id = $1")
                 .bind(puzzle_row.quote_id)
                 .fetch_one(&self.pool)
                 .await
@@ -90,6 +92,7 @@ impl PuzzleRepository {
             author: quote_row.author,
             source: quote_row.source,
             cipher_map: parse_cipher_map_from_json(&puzzle_row.cipher_map)?,
+            quote: quote_row.quote,
         })
     }
 }

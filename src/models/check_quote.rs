@@ -14,5 +14,4 @@ pub struct CheckQuoteRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CheckQuoteResponse {
     pub is_quote_correct: bool,
-    pub streak: Option<i32>,
 }
