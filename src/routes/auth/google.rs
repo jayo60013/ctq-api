@@ -79,7 +79,9 @@ async fn google_callback(
         .exchange_code_for_token(code, code_verifier)
         .await?;
 
-    let google_payload = oauth_service.verify_id_token(&id_token).await?;
+    let google_payload = oauth_service
+        .verify_id_token(&id_token.0, &id_token.1)
+        .await?;
 
     let user_repo = UserRepository::new(pool.get_ref().clone());
     let user = user_repo

@@ -52,7 +52,7 @@ impl GoogleOAuthService {
         &self,
         code: &str,
         code_verifier: &str,
-    ) -> Result<String, ApiError> {
+    ) -> Result<(String, String), ApiError> {
         let client = reqwest::Client::new();
 
         let body = format!(
@@ -78,10 +78,14 @@ impl GoogleOAuthService {
             ApiError::ExternalServiceError(format!("Failed to parse token response: {e}"))
         })?;
 
-        Ok(token_response.id_token)
+        Ok((token_response.id_token, token_response.access_token))
     }
 
-    pub async fn verify_id_token(&self, id_token: &str) -> Result<GoogleIdTokenPayload, ApiError> {
+    pub async fn verify_id_token(
+        &self,
+        id_token: &str,
+        access_token: &str,
+    ) -> Result<GoogleIdTokenPayload, ApiError> {
         let client = reqwest::Client::new();
 
         let url = format!("https://www.googleapis.com/oauth2/v1/tokeninfo?id_token={id_token}");
@@ -102,7 +106,7 @@ impl GoogleOAuthService {
 
         tracing::debug!("Google tokeninfo response: {}", text);
 
-        let payload: GoogleIdTokenPayload = serde_json::from_str(&text).map_err(|e| {
+        let mut payload: GoogleIdTokenPayload = serde_json::from_str(&text).map_err(|e| {
             tracing::error!(
                 "Failed to parse token payload. Response body: {}. Error: {}",
                 text,
@@ -116,6 +120,49 @@ impl GoogleOAuthService {
                 "Invalid audience in token".to_string(),
             ));
         }
+
+        // Fetch user profile info separately to get name and picture
+        // The tokeninfo endpoint doesn't return these fields, but the userinfo endpoint does
+        if let Ok(userinfo) = self.get_userinfo(access_token).await {
+            if payload.name.is_none() {
+                payload.name = userinfo.name;
+            }
+            if payload.picture.is_none() {
+                payload.picture = userinfo.picture;
+            }
+        }
+
+        Ok(payload)
+    }
+
+    async fn get_userinfo(&self, access_token: &str) -> Result<GoogleIdTokenPayload, ApiError> {
+        let client = reqwest::Client::new();
+
+        let url =
+            format!("https://www.googleapis.com/oauth2/v1/userinfo?access_token={access_token}");
+
+        let response = client.get(&url).send().await.map_err(|e| {
+            ApiError::ExternalServiceError(format!("User info request failed: {e}"))
+        })?;
+
+        if !response.status().is_success() {
+            return Err(ApiError::ExternalServiceError(
+                "Failed to fetch user info".to_string(),
+            ));
+        }
+
+        let text = response.text().await.map_err(|e| {
+            ApiError::ExternalServiceError(format!("Failed to read userinfo response: {e}"))
+        })?;
+
+        let payload: GoogleIdTokenPayload = serde_json::from_str(&text).map_err(|e| {
+            tracing::error!(
+                "Failed to parse userinfo payload. Response body: {}. Error: {}",
+                text,
+                e
+            );
+            ApiError::ExternalServiceError(format!("Failed to parse userinfo payload: {e}"))
+        })?;
 
         Ok(payload)
     }
