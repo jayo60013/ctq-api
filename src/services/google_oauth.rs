@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 use crate::error::ApiError;
+use crate::models::auth::GoogleUserInfo;
 use crate::models::{GoogleIdTokenPayload, GoogleTokenResponse};
 
 pub struct GoogleOAuthService {
@@ -135,27 +136,32 @@ impl GoogleOAuthService {
         Ok(payload)
     }
 
-    async fn get_userinfo(&self, access_token: &str) -> Result<GoogleIdTokenPayload, ApiError> {
+    async fn get_userinfo(&self, access_token: &str) -> Result<GoogleUserInfo, ApiError> {
         let client = reqwest::Client::new();
 
         let url =
             format!("https://www.googleapis.com/oauth2/v1/userinfo?access_token={access_token}");
+
+        tracing::debug!("Fetching userinfo from: {}", url);
 
         let response = client.get(&url).send().await.map_err(|e| {
             ApiError::ExternalServiceError(format!("User info request failed: {e}"))
         })?;
 
         if !response.status().is_success() {
-            return Err(ApiError::ExternalServiceError(
-                "Failed to fetch user info".to_string(),
-            ));
+            return Err(ApiError::ExternalServiceError(format!(
+                "Failed to fetch user info. Status: {}",
+                response.status()
+            )));
         }
 
         let text = response.text().await.map_err(|e| {
             ApiError::ExternalServiceError(format!("Failed to read userinfo response: {e}"))
         })?;
 
-        let payload: GoogleIdTokenPayload = serde_json::from_str(&text).map_err(|e| {
+        tracing::debug!("Google userinfo response: {}", text);
+
+        let userinfo: GoogleUserInfo = serde_json::from_str(&text).map_err(|e| {
             tracing::error!(
                 "Failed to parse userinfo payload. Response body: {}. Error: {}",
                 text,
@@ -164,6 +170,6 @@ impl GoogleOAuthService {
             ApiError::ExternalServiceError(format!("Failed to parse userinfo payload: {e}"))
         })?;
 
-        Ok(payload)
+        Ok(userinfo)
     }
 }
