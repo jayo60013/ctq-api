@@ -99,6 +99,8 @@ async fn google_callback(
     let response = AuthResponse {
         user_id: user.id.to_string(),
         email: user.email,
+        display_name: user.display_name,
+        avatar_url: user.avatar_url,
     };
 
     let mut http_response = HttpResponse::Ok().json(response);
