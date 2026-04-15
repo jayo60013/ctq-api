@@ -27,7 +27,6 @@ async fn get_activity_summary(
 
     let activities = ActivityService::fetch_activity_summary(
         pool.get_ref(),
-        &config,
         user.id,
         date_range.from,
         date_range.to,

@@ -20,11 +20,10 @@ use crate::{
 #[get("/daily")]
 async fn get_daily_puzzle(
     pool: web::Data<PgPool>,
-    config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
 ) -> Result<HttpResponse, ApiError> {
     let repo = PuzzleRepository::new(pool.get_ref().clone());
-    let puzzle = cache.get_puzzle(&repo, &config).await?;
+    let puzzle = cache.get_puzzle(&repo).await?;
 
     let response = PuzzleResponse {
         id: puzzle.id,
@@ -40,7 +39,6 @@ async fn get_daily_puzzle(
 #[post("/daily/check-letter")]
 async fn check_daily_letter(
     pool: web::Data<PgPool>,
-    config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
     req: web::Json<CheckLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
@@ -48,7 +46,7 @@ async fn check_daily_letter(
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
-    let puzzle = cache.get_puzzle(&repo, &config).await?;
+    let puzzle = cache.get_puzzle(&repo).await?;
 
     let is_correct =
         PuzzleService::check_letter(req.cipher_letter, req.letter_to_check, &puzzle.cipher_map);
@@ -62,7 +60,6 @@ async fn check_daily_letter(
 #[post("/daily/solve-letter")]
 async fn solve_daily_letter(
     pool: web::Data<PgPool>,
-    config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
     req: web::Json<SolveLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
@@ -70,7 +67,7 @@ async fn solve_daily_letter(
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
-    let puzzle = cache.get_puzzle(&repo, &config).await?;
+    let puzzle = cache.get_puzzle(&repo).await?;
 
     let correct_letter = PuzzleService::solve_letter(req.cipher_letter, &puzzle.cipher_map)?;
 
@@ -95,15 +92,14 @@ async fn check_daily_quote(
     })?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
-    let puzzle = cache.get_puzzle(&repo, &config).await?;
+    let puzzle = cache.get_puzzle(&repo).await?;
 
     let is_correct = PuzzleService::check_quote(&req.cipher_map, &puzzle.cipher_map);
 
-    let jwt_service = JwtService::new(&config.jwt_secret);
     let mut streak = None;
 
+    let jwt_service = JwtService::new(&config.jwt_secret);
     if let Ok(user) = extract_authenticated_user(&http_req, &jwt_service) {
-        let puzzle_id = ActivityService::calculate_puzzle_id_for_daily(&config);
         let activity_req = ActivityUpdateRequest {
             checks_used: req.checks_used,
             solves_used: req.solves_used,
@@ -111,7 +107,7 @@ async fn check_daily_quote(
         let current_streak = ActivityService::track_activity(
             pool.get_ref(),
             user.id,
-            puzzle_id,
+            puzzle.id,
             is_correct,
             true,
             &activity_req,

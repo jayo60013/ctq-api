@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
-    config::EnvConfig,
     error::ApiError,
     repository::{Puzzle, PuzzleRepository},
 };
@@ -33,12 +32,8 @@ impl DailyPuzzleCache {
         }
     }
 
-    pub async fn get_puzzle(
-        &self,
-        pool_repo: &PuzzleRepository,
-        config: &EnvConfig,
-    ) -> Result<Puzzle, ApiError> {
-        self.ensure_cached(pool_repo, config).await?;
+    pub async fn get_puzzle(&self, pool_repo: &PuzzleRepository) -> Result<Puzzle, ApiError> {
+        self.ensure_cached(pool_repo).await?;
 
         let cached = self.response.read().await;
         Ok(cached
@@ -48,11 +43,7 @@ impl DailyPuzzleCache {
             .clone())
     }
 
-    async fn ensure_cached(
-        &self,
-        pool_repo: &PuzzleRepository,
-        config: &EnvConfig,
-    ) -> Result<(), ApiError> {
+    async fn ensure_cached(&self, pool_repo: &PuzzleRepository) -> Result<(), ApiError> {
         let today = Utc::now().date_naive();
         let mut last_date = self.last_date.write().await;
 
@@ -72,9 +63,8 @@ impl DailyPuzzleCache {
             }
         }
 
-        let puzzle_id = Self::calculate_puzzle_id(today, config);
         let db_puzzle = pool_repo
-            .get_by_id(puzzle_id)
+            .get_by_date(today)
             .await
             .map_err(|err| match err {
                 ApiError::NotFound => {
@@ -92,11 +82,5 @@ impl DailyPuzzleCache {
         }
 
         Ok(())
-    }
-
-    #[allow(clippy::cast_possible_truncation)]
-    fn calculate_puzzle_id(date: NaiveDate, config: &EnvConfig) -> i32 {
-        let days_since_start = (date - config.start_date).num_days();
-        (days_since_start + 1) as i32
     }
 }

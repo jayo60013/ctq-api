@@ -21,7 +21,7 @@ use crate::{
 async fn get_puzzle(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
-    id: web::Path<i32>,
+    id: web::Path<uuid::Uuid>,
     req: HttpRequest,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
@@ -46,7 +46,7 @@ async fn get_puzzle(
 async fn check_letter(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
-    id: web::Path<i32>,
+    id: web::Path<uuid::Uuid>,
     req: HttpRequest,
     body: web::Json<CheckLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
@@ -72,7 +72,7 @@ async fn check_letter(
 async fn solve_letter(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
-    id: web::Path<i32>,
+    id: web::Path<uuid::Uuid>,
     req: HttpRequest,
     body: web::Json<SolveLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
@@ -95,7 +95,7 @@ async fn solve_letter(
 async fn check_quote(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
-    id: web::Path<i32>,
+    id: web::Path<uuid::Uuid>,
     req: HttpRequest,
     body: web::Json<CheckQuoteRequest>,
 ) -> Result<HttpResponse, ApiError> {

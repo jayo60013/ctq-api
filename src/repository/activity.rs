@@ -2,34 +2,60 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::config::EnvConfig;
 use crate::error::ApiError;
 use crate::models::ActivityRow;
 
 pub async fn upsert_activity(
     pool: &PgPool,
     user_id: Uuid,
-    puzzle_id: i32,
+    puzzle_id: Uuid,
     checks_used: i32,
     solves_used: i32,
     is_solved: bool,
     is_daily_flag: bool,
 ) -> Result<(), ApiError> {
-    let yesterday_puzzle_id = puzzle_id - 1;
-
     let current_streak = if is_daily_flag && is_solved {
-        let yesterday_streak = sqlx::query_scalar::<_, i32>(
-            "SELECT current_streak FROM user_puzzle_activity WHERE user_id = $1 AND puzzle_id = $2 AND is_solved = true"
+        let yesterday_date = sqlx::query_scalar::<_, Option<NaiveDate>>(
+            r"
+            SELECT MAX(p.daily_date)
+            FROM activities a
+            JOIN puzzles p ON a.puzzle_id = p.id
+            WHERE a.user_id = $1
+                AND p.daily_date < (SELECT daily_date FROM puzzles WHERE id = $2)
+                AND a.is_solved = true
+            ORDER BY p.daily_date DESC LIMIT 1
+            ",
         )
         .bind(user_id)
-        .bind(yesterday_puzzle_id)
+        .bind(puzzle_id)
         .fetch_optional(pool)
         .await
-        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+        .flatten();
 
-        match yesterday_streak {
-            Some(streak) => streak + 1,
-            None => 1,
+        if let Some(yesterday) = yesterday_date {
+            let yesterday_streak = sqlx::query_scalar::<_, i32>(
+                r"
+                SELECT current_streak
+                FROM activities a
+                JOIN puzzles p ON a.puzzle_id = p.id
+                WHERE a.user_id = $1
+                    AND p.daily_date = $2
+                    AND a.is_solved = true
+                ",
+            )
+            .bind(user_id)
+            .bind(yesterday)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+            match yesterday_streak {
+                Some(streak) => streak + 1,
+                None => 1,
+            }
+        } else {
+            1
         }
     } else {
         0
@@ -70,10 +96,15 @@ pub async fn upsert_activity(
 pub async fn get_activity(
     pool: &PgPool,
     user_id: Uuid,
-    puzzle_id: i32,
+    puzzle_id: Uuid,
 ) -> Result<Option<ActivityRow>, ApiError> {
     let activity = sqlx::query_as::<_, ActivityRow>(
-        "SELECT user_id, puzzle_id, completed_at, attempts, checks_used, solves_used, is_solved, is_daily_flag, current_streak FROM user_puzzle_activity WHERE user_id = $1 AND puzzle_id = $2",
+        r"
+        SELECT user_id, puzzle_id, completed_at, attempts, checks_used, solves_used, is_solved, is_daily_flag, current_streak
+        FROM activities
+        WHERE user_id = $1
+            AND puzzle_id = $2
+        "
     )
     .bind(user_id)
     .bind(puzzle_id)
@@ -86,31 +117,61 @@ pub async fn get_activity(
 
 pub async fn get_activities_by_date_range(
     pool: &PgPool,
-    config: &EnvConfig,
     user_id: Uuid,
     from_date: NaiveDate,
     to_date: NaiveDate,
-) -> Result<Vec<ActivityRow>, ApiError> {
-    let days_from_start = i32::try_from((from_date - config.start_date).num_days()).unwrap();
-    let days_to_start = i32::try_from((to_date - config.start_date).num_days()).unwrap();
+) -> Result<Vec<(ActivityRow, NaiveDate)>, ApiError> {
+    #[derive(sqlx::FromRow)]
+    struct ActivityWithDate {
+        user_id: Uuid,
+        puzzle_id: Uuid,
+        completed_at: Option<chrono::DateTime<chrono::Utc>>,
+        attempts: i32,
+        checks_used: i32,
+        solves_used: i32,
+        is_solved: bool,
+        is_daily_flag: bool,
+        current_streak: i32,
+        daily_date: NaiveDate,
+    }
 
-    let from_puzzle_id = days_from_start + 1;
-    let to_puzzle_id = days_to_start + 1;
-
-    let activities = sqlx::query_as::<_, ActivityRow>(
+    let rows = sqlx::query_as::<_, ActivityWithDate>(
         r"
-        SELECT user_id, puzzle_id, completed_at, attempts, checks_used, solves_used, is_solved, is_daily_flag, current_streak
-        FROM activities
-        WHERE user_id = $1 AND puzzle_id >= $2 AND puzzle_id <= $3
-        ORDER BY puzzle_id ASC
+        SELECT a.user_id, a.puzzle_id, a.completed_at, a.attempts, a.checks_used, a.solves_used, a.is_solved, a.is_daily_flag, a.current_streak, p.daily_date
+        FROM activities a
+        JOIN puzzles p ON a.puzzle_id = p.id
+        WHERE a.user_id = $1
+            AND p.daily_date >= $2
+            AND p.daily_date <= $3
+        ORDER BY p.daily_date ASC
         "
     )
     .bind(user_id)
-    .bind(from_puzzle_id)
-    .bind(to_puzzle_id)
+    .bind(from_date)
+    .bind(to_date)
     .fetch_all(pool)
     .await
     .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+    let activities = rows
+        .into_iter()
+        .map(|row| {
+            (
+                ActivityRow {
+                    user_id: row.user_id,
+                    puzzle_id: row.puzzle_id,
+                    completed_at: row.completed_at,
+                    attempts: row.attempts,
+                    checks_used: row.checks_used,
+                    solves_used: row.solves_used,
+                    is_solved: row.is_solved,
+                    is_daily_flag: row.is_daily_flag,
+                    current_streak: row.current_streak,
+                },
+                row.daily_date,
+            )
+        })
+        .collect();
 
     Ok(activities)
 }

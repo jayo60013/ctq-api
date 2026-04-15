@@ -3,7 +3,6 @@ use chrono::NaiveDate;
 #[derive(Debug, Clone)]
 pub struct EnvConfig {
     pub database_url: String,
-    pub start_date: NaiveDate,
     pub debug: bool,
     pub allowed_origins: Vec<String>,
     pub google_client_id: String,
@@ -18,10 +17,6 @@ impl EnvConfig {
         dotenvy::dotenv().ok();
 
         let database_url = std::env::var("DATABASE_URL")?;
-
-        let start_date_str =
-            std::env::var("START_DATE").unwrap_or_else(|_| "2026-01-01".to_string());
-        let start_date = NaiveDate::parse_from_str(&start_date_str, "%Y-%m-%d")?;
 
         let debug = std::env::var("DEBUG")
             .map(|v| v.to_lowercase() == "true")
@@ -46,7 +41,6 @@ impl EnvConfig {
 
         Ok(EnvConfig {
             database_url,
-            start_date,
             debug,
             allowed_origins,
             google_client_id,

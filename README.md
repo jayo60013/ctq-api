@@ -189,7 +189,7 @@ Validate the entire cipher map solution
 Fetch a specific puzzle by ID
 
 **Parameters:**
-- `id` (integer): Puzzle ID (calculated as days since START_DATE + 1)
+- `id` (uuid): Puzzle ID
 
 **Response (200 OK):**
 Same as daily puzzle response
@@ -237,7 +237,6 @@ Verify API is running
 | `GOOGLE_CLIENT_ID` | Yes | — | OAuth client ID from [Google Console](https://console.cloud.google.com) |
 | `GOOGLE_CLIENT_SECRET` | Yes | — | OAuth client secret from Google Console |
 | `JWT_SECRET` | Yes | — | Secret key for signing session JWTs (use a random 32+ character string) |
-| `START_DATE` | No | `2026-01-01` | Puzzle series start date (YYYY-MM-DD) |
 | `DEBUG` | No | `false` | Enable debug logging |
 | `ALLOWED_ORIGINS` | No | `http://localhost:3000` | CORS allowed origins (comma-separated) |
 | `GOOGLE_REDIRECT_URI` | No | `http://localhost:3000/auth/callback` | OAuth redirect URI (must match Google Console exactly) |
@@ -264,21 +263,6 @@ All errors follow RFC 7807 Problem Details format:
 | 404 | Resource not found / puzzle in future |
 | 500 | Internal server error |
 | 503 | Puzzle not generated yet |
-
----
-
-## Puzzle ID Calculation
-
-Puzzle IDs are calculated based on the date offset from START_DATE:
-
-```
-puzzle_id = (puzzle_date - START_DATE).days() + 1
-```
-
-Example: If START_DATE is 2026-01-01:
-- 2026-01-01 → puzzle_id = 1
-- 2026-01-02 → puzzle_id = 2
-- 2026-04-02 → puzzle_id = 92
 
 ---
 

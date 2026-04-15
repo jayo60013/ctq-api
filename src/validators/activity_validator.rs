@@ -6,7 +6,7 @@ pub fn validate_activity_request(req: &ActivityUpdateRequest) -> Result<(), ApiE
 
     if total_cost > 10 {
         return Err(ApiError::ValidationError(format!(
-            "checks_used ({}) + hints_used * 2 ({}) must be <= 10, got {}",
+            "checks_used ({}) + solves_used * 2 ({}) must be <= 10, got {}",
             req.checks_used,
             req.solves_used * 2,
             total_cost
