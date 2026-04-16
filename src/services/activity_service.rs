@@ -3,10 +3,12 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::ApiError;
-use crate::models::{ActivityRow, ActivityRowDto, ActivityUpdateRequest, StatsResponse};
+use crate::models::{
+    ActivityRow, ActivityState, ActivitySummaryResponse, ActivityUpdateRequest, StatsResponse,
+};
 use crate::repository::{
-    get_activities_by_date_range, get_activity, get_average_attempts, get_current_streak,
-    get_highest_streak, get_total_played_puzzles, upsert_activity,
+    get_activity, get_average_attempts, get_current_streak, get_highest_streak,
+    get_puzzles_with_activities_by_date_range, get_total_played_puzzles, upsert_activity,
 };
 
 pub struct ActivityService;
@@ -46,10 +48,30 @@ impl ActivityService {
         user_id: Uuid,
         from_date: NaiveDate,
         to_date: NaiveDate,
-    ) -> Result<Vec<ActivityRowDto>, ApiError> {
-        let activities = get_activities_by_date_range(pool, user_id, from_date, to_date).await?;
+    ) -> Result<Vec<ActivitySummaryResponse>, ApiError> {
+        let puzzles_with_activities =
+            get_puzzles_with_activities_by_date_range(pool, user_id, from_date, to_date).await?;
 
-        let response = activities.into_iter().map(ActivityRowDto::from).collect();
+        let response = puzzles_with_activities
+            .into_iter()
+            .map(|(daily_date, puzzle_id, activity)| {
+                let state = activity.map(|act| ActivityState {
+                    completed_at: act.completed_at,
+                    attempts: act.attempts,
+                    checks_used: act.checks_used,
+                    solves_used: act.solves_used,
+                    is_solved: act.is_solved,
+                    is_daily_flag: act.is_daily_flag,
+                    current_streak: act.current_streak,
+                });
+
+                ActivitySummaryResponse {
+                    puzzle_id,
+                    daily_date,
+                    state,
+                }
+            })
+            .collect();
 
         Ok(response)
     }

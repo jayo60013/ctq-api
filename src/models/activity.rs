@@ -19,9 +19,7 @@ pub struct ActivityRow {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ActivityRowDto {
-    pub puzzle_id: Uuid,
-    pub daily_date: NaiveDate,
+pub struct ActivityState {
     pub completed_at: Option<DateTime<Utc>>,
     pub attempts: i32,
     pub checks_used: i32,
@@ -31,20 +29,12 @@ pub struct ActivityRowDto {
     pub current_streak: i32,
 }
 
-impl From<(ActivityRow, NaiveDate)> for ActivityRowDto {
-    fn from((row, daily_date): (ActivityRow, NaiveDate)) -> Self {
-        ActivityRowDto {
-            puzzle_id: row.puzzle_id,
-            daily_date,
-            completed_at: row.completed_at,
-            attempts: row.attempts,
-            checks_used: row.checks_used,
-            solves_used: row.solves_used,
-            is_solved: row.is_solved,
-            is_daily_flag: row.is_daily_flag,
-            current_streak: row.current_streak,
-        }
-    }
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitySummaryResponse {
+    pub puzzle_id: Uuid,
+    pub daily_date: NaiveDate,
+    pub state: Option<ActivityState>,
 }
 
 #[derive(Debug, Deserialize)]

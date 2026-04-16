@@ -114,33 +114,32 @@ pub async fn get_activity(
     Ok(activity)
 }
 
-pub async fn get_activities_by_date_range(
+pub async fn get_puzzles_with_activities_by_date_range(
     pool: &PgPool,
     user_id: Uuid,
     from_date: NaiveDate,
     to_date: NaiveDate,
-) -> Result<Vec<(ActivityRow, NaiveDate)>, ApiError> {
+) -> Result<Vec<(NaiveDate, Uuid, Option<ActivityRow>)>, ApiError> {
     #[derive(sqlx::FromRow)]
-    struct ActivityWithDate {
-        user_id: Uuid,
-        puzzle_id: Uuid,
-        completed_at: Option<chrono::DateTime<chrono::Utc>>,
-        attempts: i32,
-        checks_used: i32,
-        solves_used: i32,
-        is_solved: bool,
-        is_daily_flag: bool,
-        current_streak: i32,
+    struct PuzzleWithOptionalActivity {
         daily_date: NaiveDate,
+        puzzle_id: Uuid,
+        user_id: Option<Uuid>,
+        completed_at: Option<chrono::DateTime<chrono::Utc>>,
+        attempts: Option<i32>,
+        checks_used: Option<i32>,
+        solves_used: Option<i32>,
+        is_solved: Option<bool>,
+        is_daily_flag: Option<bool>,
+        current_streak: Option<i32>,
     }
 
-    let rows = sqlx::query_as::<_, ActivityWithDate>(
+    let rows = sqlx::query_as::<_, PuzzleWithOptionalActivity>(
         r"
-        SELECT a.user_id, a.puzzle_id, a.completed_at, a.attempts, a.checks_used, a.solves_used, a.is_solved, a.is_daily_flag, a.current_streak, p.daily_date
-        FROM activities a
-        JOIN puzzles p ON a.puzzle_id = p.id
-        WHERE a.user_id = $1
-            AND p.daily_date >= $2
+        SELECT p.daily_date, p.id as puzzle_id, a.user_id, a.completed_at, a.attempts, a.checks_used, a.solves_used, a.is_solved, a.is_daily_flag, a.current_streak
+        FROM puzzles p
+        LEFT JOIN activities a ON p.id = a.puzzle_id AND a.user_id = $1
+        WHERE p.daily_date >= $2
             AND p.daily_date <= $3
         ORDER BY p.daily_date ASC
         "
@@ -152,27 +151,25 @@ pub async fn get_activities_by_date_range(
     .await
     .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-    let activities = rows
+    let results = rows
         .into_iter()
         .map(|row| {
-            (
-                ActivityRow {
-                    user_id: row.user_id,
-                    puzzle_id: row.puzzle_id,
-                    completed_at: row.completed_at,
-                    attempts: row.attempts,
-                    checks_used: row.checks_used,
-                    solves_used: row.solves_used,
-                    is_solved: row.is_solved,
-                    is_daily_flag: row.is_daily_flag,
-                    current_streak: row.current_streak,
-                },
-                row.daily_date,
-            )
+            let activity = row.user_id.map(|user_id| ActivityRow {
+                user_id,
+                puzzle_id: row.puzzle_id,
+                completed_at: row.completed_at,
+                attempts: row.attempts.unwrap_or(0),
+                checks_used: row.checks_used.unwrap_or(0),
+                solves_used: row.solves_used.unwrap_or(0),
+                is_solved: row.is_solved.unwrap_or(false),
+                is_daily_flag: row.is_daily_flag.unwrap_or(false),
+                current_streak: row.current_streak.unwrap_or(0),
+            });
+            (row.daily_date, row.puzzle_id, activity)
         })
         .collect();
 
-    Ok(activities)
+    Ok(results)
 }
 
 pub async fn get_total_played_puzzles(pool: &PgPool, user_id: Uuid) -> Result<i64, ApiError> {

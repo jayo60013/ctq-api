@@ -11,7 +11,7 @@ pub mod solve_letter;
 pub mod stats;
 pub mod user;
 
-pub use activity::{ActivityRow, ActivityRowDto, ActivityUpdateRequest};
+pub use activity::{ActivityRow, ActivityState, ActivitySummaryResponse, ActivityUpdateRequest};
 pub use auth::{AuthResponse, GoogleIdTokenPayload, GoogleTokenResponse};
 pub use check_letter::{CheckLetterRequest, CheckLetterResponse};
 pub use check_quote::{CheckQuoteRequest, CheckQuoteResponse};
