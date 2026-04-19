@@ -13,7 +13,7 @@ use crate::{
         CheckQuoteResponse, PuzzleResponse, SolveLetterRequest, SolveLetterResponse,
     },
     puzzle_cache::DailyPuzzleCache,
-    repository::{is_puzzle_solved, PuzzleRepository},
+    repository::{get_activity, increment_activity_usage, is_puzzle_solved, PuzzleRepository},
     services::{JwtService, PuzzleService},
     validators,
 };
@@ -36,9 +36,7 @@ async fn get_daily_puzzle(
 
             if is_solved {
                 // Get activity data
-                if let Ok(Some(activity)) =
-                    crate::repository::get_activity(pool.get_ref(), user.id, puzzle.id).await
-                {
+                if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, puzzle.id).await {
                     PuzzleState::solved(
                         puzzle.quote.clone(),
                         activity.checks_used,
@@ -48,7 +46,12 @@ async fn get_daily_puzzle(
                     PuzzleState::not_solved()
                 }
             } else {
-                PuzzleState::not_solved()
+                // Check if there's activity for this puzzle (checks/solves used)
+                if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, puzzle.id).await {
+                    PuzzleState::not_solved_with_usage(activity.checks_used, activity.solves_used)
+                } else {
+                    PuzzleState::not_solved()
+                }
             }
         } else {
             PuzzleState::not_solved()
@@ -69,17 +72,30 @@ async fn get_daily_puzzle(
 #[post("/daily/check-letter")]
 async fn check_daily_letter(
     pool: web::Data<PgPool>,
+    config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
-    req: web::Json<CheckLetterRequest>,
+    req: HttpRequest,
+    body: web::Json<CheckLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    req.validate()
+    body.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
     let puzzle = cache.get_puzzle(&repo).await?;
 
     let is_correct =
-        PuzzleService::check_letter(req.cipher_letter, req.letter_to_check, &puzzle.cipher_map);
+        PuzzleService::check_letter(body.cipher_letter, body.letter_to_check, &puzzle.cipher_map);
+
+    // If user is authenticated, track the check usage
+    let jwt_service = JwtService::new(&config.jwt_secret);
+    if let Ok(user) = extract_authenticated_user(&req, &jwt_service) {
+        // Get current activity to check budget
+        if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, puzzle.id).await {
+            validators::validate_budget(activity.checks_used, activity.solves_used, 1)?;
+        }
+        // Increment checks_used by 1
+        increment_activity_usage(pool.get_ref(), user.id, puzzle.id, 1, 0).await?;
+    }
 
     let response = CheckLetterResponse {
         is_letter_correct: is_correct,
@@ -90,16 +106,29 @@ async fn check_daily_letter(
 #[post("/daily/solve-letter")]
 async fn solve_daily_letter(
     pool: web::Data<PgPool>,
+    config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
-    req: web::Json<SolveLetterRequest>,
+    req: HttpRequest,
+    body: web::Json<SolveLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    req.validate()
+    body.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
 
     let repo = PuzzleRepository::new(pool.get_ref().clone());
     let puzzle = cache.get_puzzle(&repo).await?;
 
-    let correct_letter = PuzzleService::solve_letter(req.cipher_letter, &puzzle.cipher_map)?;
+    let correct_letter = PuzzleService::solve_letter(body.cipher_letter, &puzzle.cipher_map)?;
+
+    // If user is authenticated, track the solve usage
+    let jwt_service = JwtService::new(&config.jwt_secret);
+    if let Ok(user) = extract_authenticated_user(&req, &jwt_service) {
+        // Get current activity to check budget
+        if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, puzzle.id).await {
+            validators::validate_budget(activity.checks_used, activity.solves_used, 2)?;
+        }
+        // Increment solves_used by 1 (costs 2 points)
+        increment_activity_usage(pool.get_ref(), user.id, puzzle.id, 0, 1).await?;
+    }
 
     let response = SolveLetterResponse { correct_letter };
     Ok(HttpResponse::Ok().json(response))

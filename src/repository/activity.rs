@@ -265,3 +265,46 @@ pub async fn is_puzzle_solved(
 
     Ok(is_solved.unwrap_or(false))
 }
+
+/// Increments `checks_used` or `solves_used` for a puzzle activity.
+/// Creates a new activity record if it doesn't exist.
+pub async fn increment_activity_usage(
+    pool: &PgPool,
+    user_id: Uuid,
+    puzzle_id: Uuid,
+    increment_checks: i32,
+    increment_solves: i32,
+) -> Result<(), ApiError> {
+    let activity = get_activity(pool, user_id, puzzle_id).await?;
+
+    let (new_checks, new_solves) = if let Some(existing) = activity {
+        // Activity exists, increment
+        (
+            existing.checks_used + increment_checks,
+            existing.solves_used + increment_solves,
+        )
+    } else {
+        // New activity, create with given values
+        (increment_checks, increment_solves)
+    };
+
+    sqlx::query(
+        r"
+        INSERT INTO activities (user_id, puzzle_id, attempts, checks_used, solves_used, is_solved, is_daily_flag, completed_at, current_streak)
+        VALUES ($1, $2, 0, $3, $4, false, false, NULL, 0)
+        ON CONFLICT (user_id, puzzle_id)
+        DO UPDATE SET
+            checks_used = $3,
+            solves_used = $4
+        ",
+    )
+    .bind(user_id)
+    .bind(puzzle_id)
+    .bind(new_checks)
+    .bind(new_solves)
+    .execute(pool)
+    .await
+    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+    Ok(())
+}

@@ -4,8 +4,8 @@ pub mod users;
 
 pub use activity::{
     get_activity, get_average_attempts, get_current_streak, get_highest_streak,
-    get_puzzles_with_activities_by_date_range, get_total_played_puzzles, is_puzzle_solved,
-    upsert_activity,
+    get_puzzles_with_activities_by_date_range, get_total_played_puzzles, increment_activity_usage,
+    is_puzzle_solved, upsert_activity,
 };
 pub use puzzles::{Puzzle, PuzzleRepository};
 pub use users::UserRepository;

@@ -12,7 +12,7 @@ use crate::{
         ActivityUpdateRequest, CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest,
         CheckQuoteResponse, PuzzleState, SolveLetterRequest, SolveLetterResponse,
     },
-    repository::{is_puzzle_solved, PuzzleRepository},
+    repository::{get_activity, increment_activity_usage, is_puzzle_solved, PuzzleRepository},
     services::{JwtService, PuzzleService},
     validators,
 };
@@ -37,9 +37,7 @@ async fn get_puzzle(
 
     let state = if is_solved {
         // Get activity data
-        if let Ok(Some(activity)) =
-            crate::repository::get_activity(pool.get_ref(), user.id, puzzle_id).await
-        {
+        if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, puzzle_id).await {
             PuzzleState::solved(
                 puzzle.quote.clone(),
                 activity.checks_used,
@@ -49,7 +47,12 @@ async fn get_puzzle(
             PuzzleState::not_solved()
         }
     } else {
-        PuzzleState::not_solved()
+        // Check if there's activity for this puzzle (checks/solves used)
+        if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, puzzle_id).await {
+            PuzzleState::not_solved_with_usage(activity.checks_used, activity.solves_used)
+        } else {
+            PuzzleState::not_solved()
+        }
     };
 
     let response = PuzzleResponse {
@@ -73,7 +76,7 @@ async fn check_letter(
     body: web::Json<CheckLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
-    let _user = middleware::extract_authenticated_user(&req, &jwt_service)?;
+    let user = middleware::extract_authenticated_user(&req, &jwt_service)?;
 
     body.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
@@ -83,6 +86,14 @@ async fn check_letter(
 
     let is_correct =
         PuzzleService::check_letter(body.cipher_letter, body.letter_to_check, &puzzle.cipher_map);
+
+    // Track the check usage
+    // Get current activity to check budget
+    if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, *id).await {
+        validators::validate_budget(activity.checks_used, activity.solves_used, 1)?;
+    }
+    // Increment checks_used by 1
+    increment_activity_usage(pool.get_ref(), user.id, *id, 1, 0).await?;
 
     let response = CheckLetterResponse {
         is_letter_correct: is_correct,
@@ -99,7 +110,7 @@ async fn solve_letter(
     body: web::Json<SolveLetterRequest>,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
-    let _user = middleware::extract_authenticated_user(&req, &jwt_service)?;
+    let user = middleware::extract_authenticated_user(&req, &jwt_service)?;
 
     body.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
@@ -108,6 +119,14 @@ async fn solve_letter(
     let puzzle = repo.get_by_id(*id).await?;
 
     let correct_letter = PuzzleService::solve_letter(body.cipher_letter, &puzzle.cipher_map)?;
+
+    // Track the solve usage
+    // Get current activity to check budget
+    if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, *id).await {
+        validators::validate_budget(activity.checks_used, activity.solves_used, 2)?;
+    }
+    // Increment solves_used by 1 (costs 2 points)
+    increment_activity_usage(pool.get_ref(), user.id, *id, 0, 1).await?;
 
     let response = SolveLetterResponse { correct_letter };
     Ok(HttpResponse::Ok().json(response))

@@ -22,6 +22,15 @@ impl PuzzleState {
         }
     }
 
+    pub fn not_solved_with_usage(checks_used: i32, solves_used: i32) -> Self {
+        PuzzleState {
+            solved: false,
+            quote: None,
+            checks_used: Some(checks_used),
+            solves_used: Some(solves_used),
+        }
+    }
+
     pub fn solved(quote: String, checks_used: i32, solves_used: i32) -> Self {
         PuzzleState {
             solved: true,
