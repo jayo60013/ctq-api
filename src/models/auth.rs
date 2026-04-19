@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[allow(dead_code)]
 pub struct GoogleAuthUrl {
     pub url: String,
@@ -35,7 +36,7 @@ pub struct GoogleIdTokenPayload {
     pub issuer: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthResponse {
     pub user_id: String,

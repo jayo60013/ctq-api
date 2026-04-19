@@ -4,8 +4,16 @@ use crate::config::EnvConfig;
 use crate::error::ApiError;
 
 // POST /auth/logout
+#[utoipa::path(
+    post,
+    path = "/auth/logout",
+    responses(
+        (status = 200, description = "Logged out successfully"),
+    ),
+    tag = "Authentication"
+)]
 #[post("/logout")]
-async fn logout(config: web::Data<EnvConfig>) -> Result<HttpResponse, ApiError> {
+pub async fn logout(config: web::Data<EnvConfig>) -> Result<HttpResponse, ApiError> {
     let mut cookie = Cookie::new("auth_token", "");
     cookie.set_path("/");
     cookie.set_http_only(true);

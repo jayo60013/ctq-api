@@ -1,6 +1,7 @@
 use actix_web::{cookie::Cookie, get, web, HttpResponse};
 use serde::Serialize;
 use sqlx::PgPool;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -11,7 +12,7 @@ use crate::{
     services::{GoogleOAuthService, JwtService},
 };
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct AuthUrlResponse {
     pub url: String,
     pub state: String,
@@ -19,8 +20,16 @@ pub struct AuthUrlResponse {
 }
 
 // GET /auth/google/url
+#[utoipa::path(
+    get,
+    path = "/auth/google/url",
+    responses(
+        (status = 200, description = "Google authentication URL generated", body = AuthUrlResponse),
+    ),
+    tag = "Authentication"
+)]
 #[get("/google/url")]
-async fn get_google_auth_url(config: web::Data<EnvConfig>) -> Result<HttpResponse, ApiError> {
+pub async fn get_google_auth_url(config: web::Data<EnvConfig>) -> Result<HttpResponse, ApiError> {
     let (code_verifier, code_challenge) = GoogleOAuthService::generate_pkce_pair();
     let state = Uuid::new_v4().to_string();
 
@@ -42,8 +51,23 @@ async fn get_google_auth_url(config: web::Data<EnvConfig>) -> Result<HttpRespons
 }
 
 // GET /auth/google/callback
+#[utoipa::path(
+    get,
+    path = "/auth/google/callback",
+    params(
+        ("code" = String, Query, description = "Authorization code from Google"),
+        ("state" = String, Query, description = "State parameter for CSRF protection"),
+        ("code_verifier" = String, Query, description = "PKCE code verifier"),
+    ),
+    responses(
+        (status = 200, description = "Authentication successful", body = AuthResponse),
+        (status = 400, description = "Invalid parameters"),
+        (status = 401, description = "Authentication failed"),
+    ),
+    tag = "Authentication"
+)]
 #[get("/google/callback")]
-async fn google_callback(
+pub async fn google_callback(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     query: web::Query<serde_json::Value>,

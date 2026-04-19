@@ -8,6 +8,7 @@ pub struct EnvConfig {
     pub google_redirect_uri: String,
     pub jwt_secret: String,
     pub secure_cookies: bool,
+    pub enable_swagger_ui: bool,
 }
 
 impl EnvConfig {
@@ -37,6 +38,10 @@ impl EnvConfig {
             .map(|v| v.to_lowercase() == "true")
             .unwrap_or(true);
 
+        let enable_swagger_ui = std::env::var("ENABLE_SWAGGER_UI")
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(false);
+
         Ok(EnvConfig {
             database_url,
             debug,
@@ -46,6 +51,7 @@ impl EnvConfig {
             google_redirect_uri,
             jwt_secret,
             secure_cookies,
+            enable_swagger_ui,
         })
     }
 }

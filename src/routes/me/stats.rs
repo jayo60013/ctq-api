@@ -4,10 +4,20 @@ use sqlx::PgPool;
 use crate::config::EnvConfig;
 use crate::error::ApiError;
 use crate::middleware::extract_authenticated_user;
+use crate::models::StatsResponse;
 use crate::services::{ActivityService, JwtService};
 
+#[utoipa::path(
+    get,
+    path = "/me/stats",
+    responses(
+        (status = 200, description = "User statistics retrieved", body = StatsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "User"
+)]
 #[get("/stats")]
-async fn get_stats(
+pub async fn get_stats(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     req: HttpRequest,

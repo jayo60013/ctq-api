@@ -18,8 +18,17 @@ use crate::{
     validators,
 };
 
+#[utoipa::path(
+    get,
+    path = "/puzzles/daily",
+    responses(
+        (status = 200, description = "Daily puzzle retrieved successfully", body = PuzzleResponse),
+        (status = 503, description = "Puzzle not generated yet"),
+    ),
+    tag = "Puzzles"
+)]
 #[get("/daily")]
-async fn get_daily_puzzle(
+pub async fn get_daily_puzzle(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
@@ -69,8 +78,19 @@ async fn get_daily_puzzle(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[utoipa::path(
+    post,
+    path = "/puzzles/daily/check-letter",
+    request_body = CheckLetterRequest,
+    responses(
+        (status = 200, description = "Letter checked successfully", body = CheckLetterResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Puzzles"
+)]
 #[post("/daily/check-letter")]
-async fn check_daily_letter(
+pub async fn check_daily_letter(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
@@ -103,8 +123,19 @@ async fn check_daily_letter(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[utoipa::path(
+    post,
+    path = "/puzzles/daily/solve-letter",
+    request_body = SolveLetterRequest,
+    responses(
+        (status = 200, description = "Letter solved successfully", body = SolveLetterResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Puzzles"
+)]
 #[post("/daily/solve-letter")]
-async fn solve_daily_letter(
+pub async fn solve_daily_letter(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,
@@ -134,8 +165,19 @@ async fn solve_daily_letter(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[utoipa::path(
+    post,
+    path = "/puzzles/daily/check-quote",
+    request_body = CheckQuoteRequest,
+    responses(
+        (status = 200, description = "Quote checked successfully", body = CheckQuoteResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Puzzles"
+)]
 #[post("/daily/check-quote")]
-async fn check_daily_quote(
+pub async fn check_daily_quote(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     cache: web::Data<DailyPuzzleCache>,

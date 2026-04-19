@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use crate::config::EnvConfig;
 use crate::error::ApiError;
 use crate::middleware::extract_authenticated_user;
+use crate::models::ActivitySummaryResponse;
 use crate::services::{ActivityService, JwtService};
 use crate::validators::DateRange;
 
@@ -13,8 +14,22 @@ pub struct QueryParams {
     pub to: String,
 }
 
+#[utoipa::path(
+    get,
+    path = "/me/activities/summary",
+    params(
+        ("from" = String, Query, description = "Start date (YYYY-MM-DD)"),
+        ("to" = String, Query, description = "End date (YYYY-MM-DD)"),
+    ),
+    responses(
+        (status = 200, description = "Activity summary retrieved", body = Vec<ActivitySummaryResponse>),
+        (status = 400, description = "Invalid date range"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Activities"
+)]
 #[get("/summary")]
-async fn get_activity_summary(
+pub async fn get_activity_summary(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     req: HttpRequest,

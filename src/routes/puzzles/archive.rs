@@ -17,8 +17,21 @@ use crate::{
     validators,
 };
 
+#[utoipa::path(
+    get,
+    path = "/puzzles/{id}",
+    params(
+        ("id" = uuid::Uuid, Path, description = "Puzzle ID")
+    ),
+    responses(
+        (status = 200, description = "Puzzle retrieved successfully", body = PuzzleResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Puzzle not found"),
+    ),
+    tag = "Puzzles"
+)]
 #[get("/{id}")]
-async fn get_puzzle(
+pub async fn get_puzzle(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     id: web::Path<uuid::Uuid>,
@@ -67,8 +80,22 @@ async fn get_puzzle(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[utoipa::path(
+    post,
+    path = "/puzzles/{id}/check-letter",
+    params(
+        ("id" = uuid::Uuid, Path, description = "Puzzle ID")
+    ),
+    request_body = CheckLetterRequest,
+    responses(
+        (status = 200, description = "Letter checked successfully", body = CheckLetterResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Puzzles"
+)]
 #[post("/{id}/check-letter")]
-async fn check_letter(
+pub async fn check_letter(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     id: web::Path<uuid::Uuid>,
@@ -101,8 +128,22 @@ async fn check_letter(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[utoipa::path(
+    post,
+    path = "/puzzles/{id}/solve-letter",
+    params(
+        ("id" = uuid::Uuid, Path, description = "Puzzle ID")
+    ),
+    request_body = SolveLetterRequest,
+    responses(
+        (status = 200, description = "Letter solved successfully", body = SolveLetterResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Puzzles"
+)]
 #[post("/{id}/solve-letter")]
-async fn solve_letter(
+pub async fn solve_letter(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     id: web::Path<uuid::Uuid>,
@@ -132,8 +173,22 @@ async fn solve_letter(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[utoipa::path(
+    post,
+    path = "/puzzles/{id}/check-quote",
+    params(
+        ("id" = uuid::Uuid, Path, description = "Puzzle ID")
+    ),
+    request_body = CheckQuoteRequest,
+    responses(
+        (status = 200, description = "Quote checked successfully", body = CheckQuoteResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Puzzles"
+)]
 #[post("/{id}/check-quote")]
-async fn check_quote(
+pub async fn check_quote(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
     id: web::Path<uuid::Uuid>,

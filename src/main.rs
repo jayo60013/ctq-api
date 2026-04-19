@@ -3,6 +3,7 @@ mod error;
 mod health;
 mod middleware;
 mod models;
+mod openapi;
 mod puzzle_cache;
 mod repository;
 mod routes;
@@ -12,9 +13,12 @@ mod validators;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use sqlx::postgres::PgPoolOptions;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use config::EnvConfig;
 use middleware::create_cors;
+use openapi::ApiDoc;
 use puzzle_cache::DailyPuzzleCache;
 
 #[actix_web::main]
@@ -60,14 +64,23 @@ async fn main() -> std::io::Result<()> {
         let allowed_origins = config.allowed_origins.clone();
         let cors = create_cors(&allowed_origins);
 
-        App::new()
+        let app = App::new()
             .app_data(pool.clone())
             .app_data(config_data.clone())
             .app_data(daily_puzzle_cache.clone())
             .wrap(cors)
             .wrap(Logger::default())
             .configure(routes::init_routes)
-            .configure(health::init)
+            .configure(health::init);
+
+        if config.enable_swagger_ui {
+            app.service(
+                SwaggerUi::new("/swagger-ui/{_:.*}")
+                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
+            )
+        } else {
+            app
+        }
     })
     .bind(("0.0.0.0", server_port))?
     .run()

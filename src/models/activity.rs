@@ -1,9 +1,10 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityRow {
     pub user_id: Uuid,
@@ -17,7 +18,7 @@ pub struct ActivityRow {
     pub current_streak: i32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityState {
     pub completed_at: Option<DateTime<Utc>>,
@@ -29,7 +30,7 @@ pub struct ActivityState {
     pub current_streak: i32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivitySummaryResponse {
     pub puzzle_id: Uuid,
@@ -37,7 +38,7 @@ pub struct ActivitySummaryResponse {
     pub state: Option<ActivityState>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ActivityUpdateRequest {
     pub checks_used: u16,
     pub solves_used: u16,
