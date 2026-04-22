@@ -42,35 +42,6 @@ impl PuzzleState {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn solved(quote: String, checks_used: i32, solves_used: i32) -> Self {
-        PuzzleState {
-            solved: true,
-            quote: Some(quote),
-            checks_used: Some(checks_used),
-            solves_used: Some(solves_used),
-            player: None,
-            global: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn solved_with_stats(
-        quote: String,
-        checks_used: i32,
-        solves_used: i32,
-        player: PlayerStats,
-    ) -> Self {
-        PuzzleState {
-            solved: true,
-            quote: Some(quote),
-            checks_used: Some(checks_used),
-            solves_used: Some(solves_used),
-            player: Some(player),
-            global: None,
-        }
-    }
-
     pub fn solved_with_stats_and_global(
         quote: String,
         checks_used: i32,

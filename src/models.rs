@@ -1,5 +1,6 @@
 pub mod activity;
 pub mod auth;
+pub mod budget;
 pub mod check_letter;
 pub mod check_quote;
 pub mod global_stats;
@@ -14,6 +15,7 @@ pub mod user;
 
 pub use activity::{ActivityRow, ActivityState, ActivitySummaryResponse};
 pub use auth::{AuthResponse, GoogleIdTokenPayload, GoogleTokenResponse};
+pub use budget::Budget;
 pub use check_letter::{CheckLetterRequest, CheckLetterResponse};
 pub use check_quote::{CheckQuoteRequest, CheckQuoteResponse, CheckQuoteState, PlayerStats};
 pub use global_stats::{GlobalStats, GlobalStatsBucket};

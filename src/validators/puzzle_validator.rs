@@ -1,5 +1,10 @@
 use std::collections::HashMap;
 
+/// Validates that a character is a lowercase ASCII letter.
+/// This validator is compatible with the `validator` crate's derive macros.
+///
+/// Takes `&char` by reference (despite being Copy) because the `validator` crate's
+/// custom validator macro requires reference parameters for proper trait implementation.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn validate_lowercase_letter(c: &char) -> Result<(), validator::ValidationError> {
     if c.is_ascii_lowercase() && c.is_ascii_alphabetic() {

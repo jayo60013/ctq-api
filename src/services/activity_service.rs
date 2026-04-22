@@ -4,11 +4,17 @@ use uuid::Uuid;
 
 use crate::error::ApiError;
 use crate::models::{
-    ActivityState, ActivitySummaryResponse, ScoreDistributionBucket, ScoreRange, StatsResponse,
+    ActivityState, ActivitySummaryResponse, CheckQuoteState, GlobalStats, PlayerStats,
+    StatsResponse,
 };
 use crate::repository::{
-    get_assist_budget_distribution, get_current_streak, get_highest_streak,
-    get_puzzles_with_activities_by_date_range, get_total_played_puzzles,
+    get_activity, get_assist_budget_distribution, get_average_score, get_current_streak,
+    get_highest_streak, get_puzzle_global_stats, get_puzzle_percentile,
+    get_puzzles_with_activities_by_date_range, get_total_played_puzzles, get_total_solved_puzzles,
+    is_puzzle_solved, update_puzzle_global_stats, upsert_activity,
+};
+use crate::transformer::{
+    build_score_distribution, build_score_distribution_with_rounding, RoundingStrategy,
 };
 
 pub struct ActivityService;
@@ -58,21 +64,11 @@ impl ActivityService {
 
         // Calculate total solved puzzles and build distribution buckets
         let total_solved: i64 = distribution.iter().map(|(_, _, count)| count).sum();
-        let score_distribution = distribution
-            .into_iter()
-            .map(|(min, max, count)| {
-                let percentage = if total_solved > 0 {
-                    (count as f64 / total_solved as f64) * 100.0
-                } else {
-                    0.0
-                };
-                ScoreDistributionBucket {
-                    range: ScoreRange { min, max },
-                    count,
-                    percentage: (percentage * 10.0).round() / 10.0, // Round to 1 decimal place
-                }
-            })
-            .collect();
+        let score_distribution = build_score_distribution_with_rounding(
+            &distribution,
+            total_solved,
+            RoundingStrategy::OneDecimalPercentage,
+        );
 
         Ok(StatsResponse {
             total_played_puzzles,
@@ -80,5 +76,170 @@ impl ActivityService {
             highest_streak,
             score_distribution,
         })
+    }
+
+    /// Builds player stats (streaks, average, distribution) for a specific user
+    pub async fn build_player_stats(pool: &PgPool, user_id: Uuid) -> Result<PlayerStats, ApiError> {
+        let current_streak = get_current_streak(pool, user_id).await?;
+        let best_streak = get_highest_streak(pool, user_id).await?;
+        let average_score = get_average_score(pool, user_id).await?;
+        let distribution_data = get_assist_budget_distribution(pool, user_id).await?;
+        let total_solved = get_total_solved_puzzles(pool, user_id).await?;
+
+        let distribution = build_score_distribution(&distribution_data, total_solved);
+
+        Ok(PlayerStats {
+            current_streak,
+            best_streak,
+            average_score,
+            distribution,
+        })
+    }
+
+    /// Builds global stats for a puzzle based on user's score
+    pub async fn build_global_stats(
+        pool: &PgPool,
+        puzzle_id: Uuid,
+        user_score: i32,
+    ) -> Result<Option<GlobalStats>, ApiError> {
+        if let Some((solve_count, total_score_sum, score_distribution)) =
+            get_puzzle_global_stats(pool, puzzle_id).await?
+        {
+            let average_score = if solve_count > 0 {
+                #[allow(clippy::cast_precision_loss)]
+                {
+                    total_score_sum as f64 / solve_count as f64
+                }
+            } else {
+                0.0
+            };
+
+            let distribution = score_distribution
+                .iter()
+                .enumerate()
+                .map(|(idx, count)| {
+                    let percentage = if solve_count > 0 {
+                        #[allow(clippy::cast_precision_loss)]
+                        {
+                            (*count as f64 / solve_count as f64) * 100.0
+                        }
+                    } else {
+                        0.0
+                    };
+                    crate::models::GlobalStatsBucket {
+                        score: idx.to_string(),
+                        percentage,
+                    }
+                })
+                .collect();
+
+            let percentile = get_puzzle_percentile(pool, puzzle_id, user_score).await?;
+
+            Ok(Some(GlobalStats {
+                average_score,
+                distribution,
+                percentile,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Records a puzzle solution: marks as solved, updates activity, and returns stats
+    /// This is for daily puzzles (`is_daily_flag=true`)
+    pub async fn record_solution(
+        pool: &PgPool,
+        user_id: Uuid,
+        puzzle_id: Uuid,
+    ) -> Result<(i32, CheckQuoteState), ApiError> {
+        // Check if this was previously solved
+        let was_already_solved = is_puzzle_solved(pool, user_id, puzzle_id)
+            .await
+            .unwrap_or(false);
+
+        // Get current activity to get current stats
+        let activity = get_activity(pool, user_id, puzzle_id).await?;
+        let (checks_used, solves_used) = if let Some(a) = activity {
+            (a.checks_used, a.solves_used)
+        } else {
+            (0, 0)
+        };
+
+        // Mark puzzle as solved
+        upsert_activity(
+            pool,
+            user_id,
+            puzzle_id,
+            checks_used,
+            solves_used,
+            true,
+            true,
+        )
+        .await?;
+
+        // Calculate score
+        let score = checks_used + (solves_used * 2);
+
+        // Update global stats only on first-time completion
+        if !was_already_solved {
+            update_puzzle_global_stats(pool, puzzle_id, score).await?;
+        }
+
+        // Build player and global stats
+        let player = Self::build_player_stats(pool, user_id).await?;
+        let global = Self::build_global_stats(pool, puzzle_id, score).await?;
+
+        let state = CheckQuoteState { player, global };
+
+        Ok((score, state))
+    }
+
+    /// Records an archive puzzle solution (`is_daily_flag=false`)
+    /// Same as `record_solution` but for archive puzzles
+    pub async fn record_archive_solution(
+        pool: &PgPool,
+        user_id: Uuid,
+        puzzle_id: Uuid,
+    ) -> Result<(i32, CheckQuoteState), ApiError> {
+        // Check if this was previously solved
+        let was_already_solved = is_puzzle_solved(pool, user_id, puzzle_id)
+            .await
+            .unwrap_or(false);
+
+        // Get current activity to get current stats
+        let activity = get_activity(pool, user_id, puzzle_id).await?;
+        let (checks_used, solves_used) = if let Some(a) = activity {
+            (a.checks_used, a.solves_used)
+        } else {
+            (0, 0)
+        };
+
+        // Mark puzzle as solved (is_daily_flag=false for archive)
+        upsert_activity(
+            pool,
+            user_id,
+            puzzle_id,
+            checks_used,
+            solves_used,
+            true,
+            false, // Archive puzzles are not daily
+        )
+        .await?;
+
+        // Calculate score
+        let score = checks_used + (solves_used * 2);
+
+        // Update global stats only on first-time completion
+        if !was_already_solved {
+            update_puzzle_global_stats(pool, puzzle_id, score).await?;
+        }
+
+        // Build player and global stats
+        let player = Self::build_player_stats(pool, user_id).await?;
+        let global = Self::build_global_stats(pool, puzzle_id, score).await?;
+
+        let state = CheckQuoteState { player, global };
+
+        Ok((score, state))
     }
 }

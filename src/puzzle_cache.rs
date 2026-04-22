@@ -67,9 +67,7 @@ impl DailyPuzzleCache {
             .get_by_date(today)
             .await
             .map_err(|err| match err {
-                ApiError::NotFound => {
-                    ApiError::DatabaseError("Puzzle not generated yet".to_string())
-                }
+                ApiError::NotFound => ApiError::PuzzleNotGenerated,
                 other => other,
             })?;
 

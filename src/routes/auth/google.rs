@@ -29,15 +29,11 @@ pub struct AuthUrlResponse {
     tag = "Authentication"
 )]
 #[get("/google/url")]
-pub async fn get_google_auth_url(config: web::Data<EnvConfig>) -> Result<HttpResponse, ApiError> {
+pub async fn get_google_auth_url(
+    oauth_service: web::Data<GoogleOAuthService>,
+) -> Result<HttpResponse, ApiError> {
     let (code_verifier, code_challenge) = GoogleOAuthService::generate_pkce_pair();
     let state = Uuid::new_v4().to_string();
-
-    let oauth_service = GoogleOAuthService::new(
-        config.google_client_id.clone(),
-        config.google_client_secret.clone(),
-        config.google_redirect_uri.clone(),
-    );
 
     let auth_url = oauth_service.create_auth_url(&state, &code_challenge);
 
@@ -70,6 +66,8 @@ pub async fn get_google_auth_url(config: web::Data<EnvConfig>) -> Result<HttpRes
 pub async fn google_callback(
     pool: web::Data<PgPool>,
     config: web::Data<EnvConfig>,
+    oauth_service: web::Data<GoogleOAuthService>,
+    jwt_service: web::Data<JwtService>,
     query: web::Query<serde_json::Value>,
 ) -> Result<HttpResponse, ApiError> {
     let code = query
@@ -93,12 +91,6 @@ pub async fn google_callback(
         ));
     }
 
-    let oauth_service = GoogleOAuthService::new(
-        config.google_client_id.clone(),
-        config.google_client_secret.clone(),
-        config.google_redirect_uri.clone(),
-    );
-
     let id_token = oauth_service
         .exchange_code_for_token(code, code_verifier)
         .await?;
@@ -117,7 +109,6 @@ pub async fn google_callback(
         )
         .await?;
 
-    let jwt_service = JwtService::new(&config.jwt_secret);
     let token = jwt_service.create_token(&user, 24)?;
 
     let response = AuthResponse {

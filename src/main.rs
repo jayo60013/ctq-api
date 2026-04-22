@@ -16,7 +16,7 @@ use sqlx::postgres::PgPoolOptions;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use config::EnvConfig;
+use config::{EnvConfig, ServiceFactory};
 use middleware::create_cors;
 use openapi::ApiDoc;
 use puzzle_cache::DailyPuzzleCache;
@@ -53,6 +53,10 @@ async fn main() -> std::io::Result<()> {
 
     tracing::info!("Connected to Postgres");
 
+    // Initialize cached services at startup
+    let jwt_service = web::Data::new(ServiceFactory::create_jwt_service(&config));
+    let oauth_service = web::Data::new(ServiceFactory::create_google_oauth_service(&config));
+
     let pool = web::Data::new(pool);
     let daily_puzzle_cache = web::Data::new(DailyPuzzleCache::new());
     let config_data = web::Data::new(config.clone());
@@ -68,6 +72,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(pool.clone())
             .app_data(config_data.clone())
             .app_data(daily_puzzle_cache.clone())
+            .app_data(jwt_service.clone())
+            .app_data(oauth_service.clone())
             .wrap(cors)
             .wrap(Logger::default())
             .configure(routes::init_routes)

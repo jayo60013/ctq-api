@@ -1,7 +1,6 @@
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use sqlx::PgPool;
 
-use crate::config::EnvConfig;
 use crate::error::ApiError;
 use crate::middleware::extract_authenticated_user;
 use crate::models::ActivitySummaryResponse;
@@ -31,12 +30,11 @@ pub struct QueryParams {
 #[get("/summary")]
 pub async fn get_activity_summary(
     pool: web::Data<PgPool>,
-    config: web::Data<EnvConfig>,
+    jwt_service: web::Data<JwtService>,
     req: HttpRequest,
     query: web::Query<QueryParams>,
 ) -> Result<HttpResponse, ApiError> {
-    let jwt_service = JwtService::new(&config.jwt_secret);
-    let user = extract_authenticated_user(&req, &jwt_service)?;
+    let user = extract_authenticated_user(&req, jwt_service.get_ref())?;
 
     let date_range = DateRange::new(&query.from, &query.to)?;
 

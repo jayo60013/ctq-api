@@ -1,7 +1,6 @@
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use sqlx::PgPool;
 
-use crate::config::EnvConfig;
 use crate::error::ApiError;
 use crate::middleware::extract_authenticated_user;
 use crate::models::StatsResponse;
@@ -19,11 +18,10 @@ use crate::services::{ActivityService, JwtService};
 #[get("/stats")]
 pub async fn get_stats(
     pool: web::Data<PgPool>,
-    config: web::Data<EnvConfig>,
+    jwt_service: web::Data<JwtService>,
     req: HttpRequest,
 ) -> Result<HttpResponse, ApiError> {
-    let jwt_service = JwtService::new(&config.jwt_secret);
-    let user = extract_authenticated_user(&req, &jwt_service)?;
+    let user = extract_authenticated_user(&req, jwt_service.get_ref())?;
 
     let stats = ActivityService::get_stats(pool.get_ref(), user.id).await?;
 
