@@ -5,9 +5,9 @@ use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
 use crate::models::{
-    ActivityRow, ActivityState, ActivitySummaryResponse, ActivityUpdateRequest, AuthResponse,
-    CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse, PuzzleResponse,
-    PuzzleState, SolveLetterRequest, SolveLetterResponse, StatsResponse,
+    ActivityRow, ActivityState, ActivitySummaryResponse, AuthResponse, CheckLetterRequest,
+    CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse, PuzzleResponse, PuzzleState,
+    ScoreDistributionBucket, ScoreRange, SolveLetterRequest, SolveLetterResponse, StatsResponse,
 };
 use crate::routes::auth::google::AuthUrlResponse;
 
@@ -42,10 +42,11 @@ use crate::routes::auth::google::AuthUrlResponse;
             AuthResponse,
             AuthUrlResponse,
             StatsResponse,
+            ScoreDistributionBucket,
+            ScoreRange,
             ActivityRow,
             ActivityState,
-            ActivitySummaryResponse,
-            ActivityUpdateRequest,
+            ActivitySummaryResponse
         )
     ),
     modifiers(&SecurityAddon),

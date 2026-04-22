@@ -3,19 +3,73 @@ use sqlx::PgPool;
 use validator::Validate;
 
 use crate::models::PuzzleResponse;
-use crate::services::ActivityService;
 use crate::{
     config::EnvConfig,
     error::ApiError,
     middleware,
     models::{
-        ActivityUpdateRequest, CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest,
-        CheckQuoteResponse, PuzzleState, SolveLetterRequest, SolveLetterResponse,
+        CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse,
+        CheckQuoteState, GlobalStats, GlobalStatsBucket, PlayerStats, PuzzleState,
+        ScoreDistributionBucket, ScoreRange, SolveLetterRequest, SolveLetterResponse,
     },
-    repository::{get_activity, increment_activity_usage, is_puzzle_solved, PuzzleRepository},
+    repository::{
+        get_activity, get_assist_budget_distribution, get_average_score, get_current_streak,
+        get_highest_streak, get_puzzle_global_stats, get_puzzle_percentile,
+        get_total_solved_puzzles, increment_activity_usage, is_puzzle_solved,
+        update_puzzle_global_stats, upsert_activity, PuzzleRepository,
+    },
     services::{JwtService, PuzzleService},
     validators,
 };
+
+/// Helper function to build `GlobalStats` from puzzle global stats data
+async fn build_global_stats(
+    pool: &PgPool,
+    puzzle_id: uuid::Uuid,
+    user_score: i32,
+) -> Result<Option<GlobalStats>, ApiError> {
+    if let Some((solve_count, total_score_sum, score_distribution)) =
+        get_puzzle_global_stats(pool, puzzle_id).await?
+    {
+        let average_score = if solve_count > 0 {
+            #[allow(clippy::cast_precision_loss)]
+            {
+                total_score_sum as f64 / solve_count as f64
+            }
+        } else {
+            0.0
+        };
+
+        let distribution = score_distribution
+            .iter()
+            .enumerate()
+            .map(|(idx, count)| {
+                let percentage = if solve_count > 0 {
+                    #[allow(clippy::cast_precision_loss)]
+                    {
+                        (*count as f64 / solve_count as f64) * 100.0
+                    }
+                } else {
+                    0.0
+                };
+                GlobalStatsBucket {
+                    score: idx.to_string(),
+                    percentage,
+                }
+            })
+            .collect();
+
+        let percentile = get_puzzle_percentile(pool, puzzle_id, user_score).await?;
+
+        Ok(Some(GlobalStats {
+            average_score,
+            distribution,
+            percentile,
+        }))
+    } else {
+        Ok(None)
+    }
+}
 
 #[utoipa::path(
     get,
@@ -51,10 +105,22 @@ pub async fn get_puzzle(
     let state = if is_solved {
         // Get activity data
         if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, puzzle_id).await {
-            PuzzleState::solved(
+            // Get global stats
+            let score = activity.checks_used + (activity.solves_used * 2);
+            let global = build_global_stats(pool.get_ref(), puzzle_id, score).await?;
+
+            PuzzleState::solved_with_stats_and_global(
                 puzzle.quote.clone(),
                 activity.checks_used,
                 activity.solves_used,
+                // Dummy player stats (not fetched for archive unless needed)
+                PlayerStats {
+                    current_streak: 0,
+                    best_streak: 0,
+                    average_score: 0.0,
+                    distribution: vec![],
+                },
+                global,
             )
         } else {
             PuzzleState::not_solved()
@@ -194,6 +260,7 @@ pub async fn check_quote(
     id: web::Path<uuid::Uuid>,
     req: HttpRequest,
     body: web::Json<CheckQuoteRequest>,
+    repo: web::Data<PuzzleRepository>,
 ) -> Result<HttpResponse, ApiError> {
     let jwt_service = JwtService::new(&config.jwt_secret);
     let user = middleware::extract_authenticated_user(&req, &jwt_service)?;
@@ -201,34 +268,96 @@ pub async fn check_quote(
     body.validate()
         .map_err(|e| ApiError::ValidationError(format!("{e:?}")))?;
 
-    validators::validate_activity_request(&ActivityUpdateRequest {
-        checks_used: body.checks_used,
-        solves_used: body.solves_used,
-    })?;
-
-    let repo = PuzzleRepository::new(pool.get_ref().clone());
     let puzzle = repo.get_by_id(*id).await?;
 
     let is_correct = PuzzleService::check_quote(&body.cipher_map, &puzzle.cipher_map);
 
-    let activity_req = ActivityUpdateRequest {
-        checks_used: body.checks_used,
-        solves_used: body.solves_used,
-    };
-    let _ = ActivityService::track_activity(
-        pool.get_ref(),
-        user.id,
-        *id,
-        is_correct,
-        false,
-        &activity_req,
-    )
-    .await;
+    if is_correct {
+        // Check if this was previously solved
+        let was_already_solved = is_puzzle_solved(pool.get_ref(), user.id, *id)
+            .await
+            .unwrap_or(false);
 
-    let response = CheckQuoteResponse {
-        is_quote_correct: is_correct,
-    };
-    Ok(HttpResponse::Ok().json(response))
+        // Get current activity to get current stats
+        let activity = get_activity(pool.get_ref(), user.id, *id).await?;
+        let (checks_used, solves_used) = if let Some(a) = activity {
+            (a.checks_used, a.solves_used)
+        } else {
+            (0, 0)
+        };
+
+        // Mark puzzle as solved
+        upsert_activity(
+            pool.get_ref(),
+            user.id,
+            *id,
+            checks_used,
+            solves_used,
+            true,
+            false, // Archive puzzles are not daily
+        )
+        .await?;
+
+        // Calculate score
+        let score = checks_used + (solves_used * 2);
+
+        // Update global stats only on first-time completion
+        if !was_already_solved {
+            update_puzzle_global_stats(pool.get_ref(), *id, score).await?;
+        }
+
+        // Get player stats
+        let current_streak = get_current_streak(pool.get_ref(), user.id).await?;
+        let best_streak = get_highest_streak(pool.get_ref(), user.id).await?;
+        let average_score = get_average_score(pool.get_ref(), user.id).await?;
+        let distribution_data = get_assist_budget_distribution(pool.get_ref(), user.id).await?;
+        let total_solved = get_total_solved_puzzles(pool.get_ref(), user.id).await?;
+
+        // Calculate distribution with percentages
+        let distribution = distribution_data
+            .iter()
+            .map(|(min, max, count)| ScoreDistributionBucket {
+                range: ScoreRange {
+                    min: *min,
+                    max: *max,
+                },
+                count: *count,
+                percentage: if total_solved > 0 {
+                    #[allow(clippy::cast_precision_loss)]
+                    {
+                        *count as f64 / total_solved as f64
+                    }
+                } else {
+                    0.0
+                },
+            })
+            .collect();
+
+        // Get global stats
+        let global = build_global_stats(pool.get_ref(), *id, score).await?;
+
+        let response = CheckQuoteResponse {
+            is_quote_correct: true,
+            score: Some(score),
+            state: Some(CheckQuoteState {
+                player: PlayerStats {
+                    current_streak,
+                    best_streak,
+                    average_score,
+                    distribution,
+                },
+                global,
+            }),
+        };
+        Ok(HttpResponse::Ok().json(response))
+    } else {
+        let response = CheckQuoteResponse {
+            is_quote_correct: false,
+            score: None,
+            state: None,
+        };
+        Ok(HttpResponse::Ok().json(response))
+    }
 }
 
 pub fn init(cfg: &mut web::ServiceConfig) {
