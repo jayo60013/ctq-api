@@ -23,5 +23,5 @@ pub use problem_details::ProblemDetails;
 pub use puzzle_response::PuzzleResponse;
 pub use puzzle_state::PuzzleState;
 pub use solve_letter::{SolveLetterRequest, SolveLetterResponse};
-pub use stats::{ScoreDistributionBucket, ScoreRange, StatsResponse};
+pub use stats::{ScoreDistributionBucket, StatsResponse};
 pub use user::{AuthenticatedUser, User, UserPayload};

@@ -2,3 +2,5 @@ target/
 Dockerfile
 .git
 .github
+
+docker-push.sh

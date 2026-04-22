@@ -200,12 +200,12 @@ pub async fn check_quote(
     id: web::Path<uuid::Uuid>,
     req: HttpRequest,
     body: web::Json<CheckQuoteRequest>,
-    repo: web::Data<PuzzleRepository>,
 ) -> Result<HttpResponse, ApiError> {
     let user = middleware::extract_authenticated_user(&req, jwt_service.get_ref())?;
 
     body.validate()?;
 
+    let repo = PuzzleRepository::new(pool.get_ref().clone());
     let puzzle = repo.get_by_id(*id).await?;
     let is_correct = PuzzleService::check_quote(&body.cipher_map, &puzzle.cipher_map);
 

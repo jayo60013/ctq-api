@@ -1,17 +1,17 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::models::{ScoreDistributionBucket, ScoreRange};
+use crate::models::ScoreDistributionBucket;
 use crate::validators::validate_cipher_map;
 
 /// Transforms raw score distribution data into buckets with percentages.
 ///
 /// # Arguments
-/// * `distribution_data` - Raw tuples of (min, max, count)
+/// * `distribution_data` - Raw tuples of (score, score, count)
 /// * `total_solved` - Total number of puzzles solved (for percentage calculation)
 ///
 /// # Returns
-/// Vector of `ScoreDistributionBucket` with percentages calculated (as decimal 0.0-1.0)
+/// Vector of `ScoreDistributionBucket` with score values and percentages calculated (as 0-100 scale)
 pub fn build_score_distribution(
     distribution_data: &[(i32, i32, i64)],
     total_solved: i64,
@@ -35,12 +35,12 @@ pub enum RoundingStrategy {
 /// Transforms raw score distribution data into buckets with customizable rounding.
 ///
 /// # Arguments
-/// * `distribution_data` - Raw tuples of (min, max, count)
+/// * `distribution_data` - Raw tuples of (score, score, count)
 /// * `total_solved` - Total number of puzzles solved (for percentage calculation)
 /// * `rounding` - How to round the percentage values
 ///
 /// # Returns
-/// Vector of `ScoreDistributionBucket` with percentages calculated and rounded
+/// Vector of `ScoreDistributionBucket` with score values and percentages calculated and rounded
 pub fn build_score_distribution_with_rounding(
     distribution_data: &[(i32, i32, i64)],
     total_solved: i64,
@@ -48,16 +48,15 @@ pub fn build_score_distribution_with_rounding(
 ) -> Vec<ScoreDistributionBucket> {
     distribution_data
         .iter()
-        .map(|(min, max, count)| {
+        .map(|(min, _max, count)| {
             #[allow(clippy::cast_precision_loss)]
             let percentage = if total_solved > 0 {
-                let raw_percentage = *count as f64 / total_solved as f64;
+                let raw_percentage = (*count as f64 / total_solved as f64) * 100.0;
                 match rounding {
                     RoundingStrategy::NoRounding => raw_percentage,
                     RoundingStrategy::OneDecimalPercentage => {
-                        // Convert to percentage (0-100 scale), round to 1 decimal, then convert back to 0-1 scale
-                        let percentage_scale = raw_percentage * 100.0;
-                        (percentage_scale * 10.0).round() / 1000.0
+                        // Round to 1 decimal place
+                        (raw_percentage * 10.0).round() / 10.0
                     }
                 }
             } else {
@@ -65,10 +64,7 @@ pub fn build_score_distribution_with_rounding(
             };
 
             ScoreDistributionBucket {
-                range: ScoreRange {
-                    min: *min,
-                    max: *max,
-                },
+                score: *min,
                 count: *count,
                 percentage,
             }
@@ -109,8 +105,8 @@ mod tests {
 
     #[test]
     fn test_build_score_distribution() {
-        // Given
-        let distribution_data = vec![(0, 2, 10i64), (3, 5, 20i64), (6, 10, 30i64)];
+        // Given - Individual scores 0, 1, 2 with counts
+        let distribution_data = vec![(0, 0, 10i64), (1, 1, 20i64), (2, 2, 30i64)];
         let total_solved = 60i64;
 
         // When
@@ -118,20 +114,24 @@ mod tests {
 
         // Then
         assert_eq!(result.len(), 3);
+        assert_eq!(result[0].score, 0);
         assert_eq!(result[0].count, 10);
-        assert!((result[0].percentage - 10.0 / 60.0).abs() < 0.0001);
+        assert!((result[0].percentage - (10.0 / 60.0 * 100.0)).abs() < 0.0001);
+        assert_eq!(result[1].score, 1);
         assert_eq!(result[1].count, 20);
-        assert!((result[1].percentage - 20.0 / 60.0).abs() < 0.0001);
+        assert!((result[1].percentage - (20.0 / 60.0 * 100.0)).abs() < 0.0001);
+        assert_eq!(result[2].score, 2);
         assert_eq!(result[2].count, 30);
-        assert!((result[2].percentage - 30.0 / 60.0).abs() < 0.0001);
+        assert!((result[2].percentage - (30.0 / 60.0 * 100.0)).abs() < 0.0001);
     }
 
     #[test]
     fn test_build_score_distribution_zero_solved() {
         // When
-        let result = build_score_distribution(&[(0, 2, 10i64)], 0i64);
+        let result = build_score_distribution(&[(0, 0, 10i64)], 0i64);
 
         // Then
+        assert_eq!(result[0].score, 0);
         assert!((result[0].percentage - 0.0).abs() < 0.0001);
     }
 
@@ -146,8 +146,8 @@ mod tests {
 
     #[test]
     fn test_build_score_distribution_with_rounding_no_rounding() {
-        // Given - 1 out of 3 = 0.333...
-        let distribution_data = vec![(0, 2, 1i64), (3, 5, 1i64), (6, 10, 1i64)];
+        // Given - 1 out of 3 = 33.333...%
+        let distribution_data = vec![(0, 0, 1i64), (1, 1, 1i64), (2, 2, 1i64)];
         let total_solved = 3i64;
 
         // When
@@ -157,14 +157,15 @@ mod tests {
             RoundingStrategy::NoRounding,
         );
 
-        // Then - Should be 0.333...
-        assert!((result[0].percentage - 1.0 / 3.0).abs() < 0.0001);
+        // Then - Should be 33.333...
+        assert_eq!(result[0].score, 0);
+        assert!((result[0].percentage - (1.0 / 3.0 * 100.0)).abs() < 0.0001);
     }
 
     #[test]
     fn test_build_score_distribution_with_rounding_one_decimal_percentage() {
-        // Given - 1 out of 3 = 0.333... = 33.3%
-        let distribution_data = vec![(0, 2, 1i64), (3, 5, 1i64), (6, 10, 1i64)];
+        // Given - 1 out of 3 = 33.3%
+        let distribution_data = vec![(0, 0, 1i64), (1, 1, 1i64), (2, 2, 1i64)];
         let total_solved = 3i64;
 
         // When
@@ -174,8 +175,9 @@ mod tests {
             RoundingStrategy::OneDecimalPercentage,
         );
 
-        // Then - Should be 0.333 (33.3% rounded to 1 decimal)
-        assert!((result[0].percentage - 0.333).abs() < 0.001);
+        // Then - Should be 33.3 (rounded to 1 decimal)
+        assert_eq!(result[0].score, 0);
+        assert!((result[0].percentage - 33.3).abs() < 0.01);
     }
 
     #[test]

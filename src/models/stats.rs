@@ -3,15 +3,8 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ScoreRange {
-    pub min: i32,
-    pub max: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ScoreDistributionBucket {
-    pub range: ScoreRange,
+    pub score: i32,
     pub count: i64,
     pub percentage: f64,
 }

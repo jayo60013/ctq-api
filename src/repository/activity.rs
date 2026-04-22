@@ -18,46 +18,42 @@ pub async fn upsert_activity(
     is_daily_flag: bool,
 ) -> Result<(), ApiError> {
     let current_streak = if is_daily_flag && is_solved {
-        let yesterday_date = sqlx::query_scalar::<_, Option<NaiveDate>>(
+        // Get the current puzzle's date
+        let current_date = sqlx::query_scalar::<_, NaiveDate>(
             r"
-            SELECT p.daily_date
+            SELECT daily_date FROM puzzles WHERE id = $1
+            ",
+        )
+        .bind(puzzle_id)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        // Calculate expected yesterday date
+        let expected_yesterday = current_date
+            .pred_opt()
+            .ok_or_else(|| ApiError::ValidationError("Invalid date calculation".to_string()))?;
+
+        // Check if there's an activity from exactly yesterday (not just any previous date)
+        let yesterday_streak = sqlx::query_scalar::<_, Option<i32>>(
+            r"
+            SELECT current_streak
             FROM activities a
             JOIN puzzles p ON a.puzzle_id = p.id
             WHERE a.user_id = $1
-                AND p.daily_date < (SELECT daily_date FROM puzzles WHERE id = $2)
+                AND p.daily_date = $2
                 AND a.is_solved = true
-            ORDER BY p.daily_date DESC LIMIT 1
             ",
         )
         .bind(user_id)
-        .bind(puzzle_id)
+        .bind(expected_yesterday)
         .fetch_optional(pool)
         .await
         .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
 
-        if let Some(yesterday) = yesterday_date {
-            let yesterday_streak = sqlx::query_scalar::<_, i32>(
-                r"
-                SELECT current_streak
-                FROM activities a
-                JOIN puzzles p ON a.puzzle_id = p.id
-                WHERE a.user_id = $1
-                    AND p.daily_date = $2
-                    AND a.is_solved = true
-                ",
-            )
-            .bind(user_id)
-            .bind(yesterday)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
-
-            match yesterday_streak {
-                Some(streak) => streak + 1,
-                None => 1,
-            }
-        } else {
-            1
+        match yesterday_streak {
+            Some(Some(streak)) => streak + 1,
+            _ => 1, // Reset streak if no activity yesterday or if activity wasn't solved
         }
     } else {
         0
@@ -302,7 +298,7 @@ pub async fn get_assist_budget_distribution(
     pool: &PgPool,
     user_id: Uuid,
 ) -> Result<Vec<(i32, i32, i64)>, ApiError> {
-    let ranges = vec![(0, 3), (4, 6), (7, 9), (10, 10)];
+    let ranges = vec![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6)];
 
     let mut distribution = Vec::new();
 
@@ -379,7 +375,19 @@ pub async fn update_puzzle_global_stats(
     sqlx::query(
         r"
         INSERT INTO puzzle_global_stats (puzzle_id, solve_count, total_score_sum, score_distribution, updated_at)
-        VALUES ($1::TEXT, 1, $2, array_fill(0::BIGINT, ARRAY[11]), now())
+        VALUES ($1::TEXT, 1, $2, ARRAY[
+            CASE WHEN $3 = 0 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 1 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 2 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 3 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 4 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 5 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 6 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 7 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 8 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 9 THEN 1::BIGINT ELSE 0::BIGINT END,
+            CASE WHEN $3 = 10 THEN 1::BIGINT ELSE 0::BIGINT END
+        ], now())
         ON CONFLICT (puzzle_id)
         DO UPDATE SET
             solve_count = puzzle_global_stats.solve_count + 1,
@@ -390,6 +398,7 @@ pub async fn update_puzzle_global_stats(
                         WHEN pos - 1 = $3 THEN elem + 1
                         ELSE elem
                     END
+                    ORDER BY pos
                 ) FROM (
                     SELECT pos, elem
                     FROM unnest(puzzle_global_stats.score_distribution) WITH ORDINALITY AS t(elem, pos)
@@ -415,7 +424,7 @@ pub async fn get_puzzle_global_stats(
 ) -> Result<Option<(i64, i64, Vec<i64>)>, ApiError> {
     let row = sqlx::query_as::<_, (i64, i64, Vec<i64>)>(
         r"
-        SELECT solve_count, total_score_sum, score_distribution
+        SELECT solve_count::BIGINT, total_score_sum::BIGINT, score_distribution
         FROM puzzle_global_stats
         WHERE puzzle_id = $1
         ",
@@ -434,12 +443,12 @@ pub async fn get_puzzle_percentile(
     puzzle_id: Uuid,
     user_score: i32,
 ) -> Result<i32, ApiError> {
-    let user_score_clamped = user_score.clamp(0, 10);
+    let user_score_clamped = user_score.clamp(0, 6);
 
     // Count how many scores are <= the user's score by summing the relevant array elements
     let position = sqlx::query_scalar::<_, i64>(
         r"
-        SELECT COALESCE(SUM(unnested), 0)
+        SELECT COALESCE(SUM(unnested)::BIGINT, 0)
         FROM puzzle_global_stats,
         LATERAL UNNEST(score_distribution[1:$2+1]) AS unnested
         WHERE puzzle_id = $1
@@ -453,7 +462,7 @@ pub async fn get_puzzle_percentile(
 
     let total = sqlx::query_scalar::<_, i64>(
         r"
-        SELECT COALESCE(solve_count, 0)
+        SELECT COALESCE(solve_count::BIGINT, 0)
         FROM puzzle_global_stats
         WHERE puzzle_id = $1
         ",

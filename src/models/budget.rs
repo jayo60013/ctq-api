@@ -5,7 +5,7 @@ use crate::error::ApiError;
 /// Budget system:
 /// - Each check costs 1 point
 /// - Each solve costs 2 points
-/// - Maximum total budget: 10 points
+/// - Maximum total budget: 6 points
 #[derive(Debug, Clone, Copy)]
 pub struct Budget {
     pub checks_used: i32,
@@ -22,7 +22,7 @@ impl Budget {
     }
 
     /// Maximum allowed budget (in points)
-    const MAX_BUDGET: i32 = 10;
+    const MAX_BUDGET: i32 = 6;
 
     /// Cost of a single letter solve (in points)
     const SOLVE_COST: i32 = 2;
@@ -70,37 +70,37 @@ mod tests {
 
     #[test]
     fn test_budget_total_used() {
-        let budget = Budget::new(2, 3);
-        assert_eq!(budget.total_used(), 8); // 2 + (3 * 2)
+        let budget = Budget::new(2, 2);
+        assert_eq!(budget.total_used(), 6); // 2 + (2 * 2)
     }
 
     #[test]
     fn test_budget_remaining() {
-        let budget = Budget::new(2, 3);
-        assert_eq!(budget.remaining(), 2); // 10 - 8
+        let budget = Budget::new(2, 2);
+        assert_eq!(budget.remaining(), 0); // 6 - 6
     }
 
     #[test]
     fn test_validate_check_sufficient() {
-        let budget = Budget::new(2, 3);
+        let budget = Budget::new(1, 2);
         assert!(budget.validate_check().is_ok());
     }
 
     #[test]
     fn test_validate_check_insufficient() {
-        let budget = Budget::new(10, 0);
+        let budget = Budget::new(6, 0);
         assert!(budget.validate_check().is_err());
     }
 
     #[test]
     fn test_validate_solve_sufficient() {
-        let budget = Budget::new(8, 0);
+        let budget = Budget::new(4, 0);
         assert!(budget.validate_solve().is_ok());
     }
 
     #[test]
     fn test_validate_solve_insufficient() {
-        let budget = Budget::new(8, 1);
+        let budget = Budget::new(4, 1);
         assert!(budget.validate_solve().is_err());
     }
 }

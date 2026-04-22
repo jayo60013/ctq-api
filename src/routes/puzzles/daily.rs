@@ -192,11 +192,11 @@ pub async fn check_daily_quote(
     jwt_service: web::Data<JwtService>,
     req: HttpRequest,
     body: web::Json<CheckQuoteRequest>,
-    repo: web::Data<PuzzleRepository>,
 ) -> Result<HttpResponse, ApiError> {
     body.validate()?;
 
-    let puzzle = cache.get_puzzle(repo.get_ref()).await?;
+    let repo = PuzzleRepository::new(pool.get_ref().clone());
+    let puzzle = cache.get_puzzle(&repo).await?;
     let is_correct = PuzzleService::check_quote(&body.cipher_map, &puzzle.cipher_map);
 
     // If user is authenticated and quote is correct, handle stats and mark as solved
