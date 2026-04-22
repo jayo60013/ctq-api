@@ -132,7 +132,7 @@ mod tests {
         let result = build_score_distribution(&[(0, 2, 10i64)], 0i64);
 
         // Then
-        assert_eq!(result[0].percentage, 0.0);
+        assert!((result[0].percentage - 0.0).abs() < 0.0001);
     }
 
     #[test]

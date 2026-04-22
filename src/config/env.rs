@@ -1,8 +1,6 @@
 /// Parse a boolean environment variable, with a default value
 fn parse_bool_env(key: &str, default: bool) -> bool {
-    std::env::var(key)
-        .map(|v| v.to_lowercase() == "true")
-        .unwrap_or(default)
+    std::env::var(key).map_or(default, |v| v.to_lowercase() == "true")
 }
 
 /// Validates that a string is not empty
