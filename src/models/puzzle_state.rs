@@ -54,7 +54,7 @@ impl PuzzleState {
         player: PlayerStats,
         global: Option<GlobalStats>,
     ) -> Self {
-        let score = checks_used + (solves_used * 2);
+        let score = 6 - (checks_used + (solves_used * 2));
         PuzzleState {
             solved: true,
             quote: Some(quote),

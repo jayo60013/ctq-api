@@ -49,7 +49,7 @@ pub async fn get_puzzle(
         // Get activity data
         if let Ok(Some(activity)) = get_activity(pool.get_ref(), user.id, puzzle_id).await {
             // Get global stats
-            let score = activity.checks_used + (activity.solves_used * 2);
+            let score = 6 - (activity.checks_used + (activity.solves_used * 2));
             let global =
                 ActivityService::build_global_stats(pool.get_ref(), puzzle_id, score).await?;
 
@@ -62,6 +62,7 @@ pub async fn get_puzzle(
                     current_streak: 0,
                     best_streak: 0,
                     average_score: 0.0,
+                    total_puzzles_completed: 0,
                     distribution: vec![],
                 },
                 global,

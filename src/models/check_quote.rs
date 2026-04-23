@@ -17,6 +17,7 @@ pub struct PlayerStats {
     pub current_streak: i32,
     pub best_streak: i32,
     pub average_score: f64,
+    pub total_puzzles_completed: i64,
     pub distribution: Vec<ScoreDistributionBucket>,
 }
 

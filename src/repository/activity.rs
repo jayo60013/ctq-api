@@ -368,9 +368,9 @@ pub async fn update_puzzle_global_stats(
     puzzle_id: Uuid,
     score: i32,
 ) -> Result<(), ApiError> {
-    // Score is the assist_budget: checks_used + (solves_used * 2)
-    // Score ranges from 0 to 10
-    let score_clamped = score.clamp(0, 10);
+    // Score is the remaining assist_budget: 6 - (checks_used + solves_used * 2)
+    // Score ranges from 0 to 6
+    let score_clamped = score.clamp(0, 6);
 
     sqlx::query(
         r"
@@ -382,11 +382,7 @@ pub async fn update_puzzle_global_stats(
             CASE WHEN $3 = 3 THEN 1::BIGINT ELSE 0::BIGINT END,
             CASE WHEN $3 = 4 THEN 1::BIGINT ELSE 0::BIGINT END,
             CASE WHEN $3 = 5 THEN 1::BIGINT ELSE 0::BIGINT END,
-            CASE WHEN $3 = 6 THEN 1::BIGINT ELSE 0::BIGINT END,
-            CASE WHEN $3 = 7 THEN 1::BIGINT ELSE 0::BIGINT END,
-            CASE WHEN $3 = 8 THEN 1::BIGINT ELSE 0::BIGINT END,
-            CASE WHEN $3 = 9 THEN 1::BIGINT ELSE 0::BIGINT END,
-            CASE WHEN $3 = 10 THEN 1::BIGINT ELSE 0::BIGINT END
+            CASE WHEN $3 = 6 THEN 1::BIGINT ELSE 0::BIGINT END
         ], now())
         ON CONFLICT (puzzle_id)
         DO UPDATE SET

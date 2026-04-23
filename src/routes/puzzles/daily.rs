@@ -52,7 +52,7 @@ pub async fn get_daily_puzzle(
                     ActivityService::build_player_stats(pool.get_ref(), user.id).await?;
 
                 // Get global stats
-                let score = activity.checks_used + (activity.solves_used * 2);
+                let score = 6 - (activity.checks_used + (activity.solves_used * 2));
                 let global =
                     ActivityService::build_global_stats(pool.get_ref(), puzzle.id, score).await?;
 

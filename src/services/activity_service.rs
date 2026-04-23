@@ -92,6 +92,7 @@ impl ActivityService {
             current_streak,
             best_streak,
             average_score,
+            total_puzzles_completed: total_solved,
             distribution,
         })
     }
@@ -178,7 +179,7 @@ impl ActivityService {
         .await?;
 
         // Calculate score
-        let score = checks_used + (solves_used * 2);
+        let score = 6 - (checks_used + (solves_used * 2));
 
         // Update global stats only on first-time completion
         if !was_already_solved {
@@ -227,7 +228,7 @@ impl ActivityService {
         .await?;
 
         // Calculate score
-        let score = checks_used + (solves_used * 2);
+        let score = 6 - (checks_used + (solves_used * 2));
 
         // Update global stats only on first-time completion
         if !was_already_solved {
