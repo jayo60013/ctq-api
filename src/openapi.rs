@@ -6,8 +6,9 @@ use utoipa::{Modify, OpenApi};
 
 use crate::models::{
     ActivityRow, ActivityState, ActivitySummaryResponse, AuthResponse, CheckLetterRequest,
-    CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse, PuzzleResponse, PuzzleState,
-    ScoreDistributionBucket, SolveLetterRequest, SolveLetterResponse, StatsResponse,
+    CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse, CheckQuoteState, Game, PlayerStats,
+    PuzzleResponse, PuzzleState, ScoreDistributionBucket, SolveLetterRequest, SolveLetterResponse,
+    StatsResponse,
 };
 use crate::routes::auth::google::AuthUrlResponse;
 
@@ -37,6 +38,9 @@ use crate::routes::auth::google::AuthUrlResponse;
             CheckLetterResponse,
             CheckQuoteRequest,
             CheckQuoteResponse,
+            CheckQuoteState,
+            Game,
+            PlayerStats,
             SolveLetterRequest,
             SolveLetterResponse,
             AuthResponse,

@@ -3,14 +3,14 @@ use sqlx::PgPool;
 
 use crate::error::ApiError;
 use crate::middleware::extract_authenticated_user;
-use crate::models::StatsResponse;
+use crate::models::PlayerStats;
 use crate::services::{ActivityService, JwtService};
 
 #[utoipa::path(
     get,
     path = "/me/stats",
     responses(
-        (status = 200, description = "User statistics retrieved", body = StatsResponse),
+        (status = 200, description = "User statistics retrieved", body = PlayerStats),
         (status = 401, description = "Unauthorized"),
     ),
     tag = "User"
@@ -23,9 +23,9 @@ pub async fn get_stats(
 ) -> Result<HttpResponse, ApiError> {
     let user = extract_authenticated_user(&req, jwt_service.get_ref())?;
 
-    let stats = ActivityService::get_stats(pool.get_ref(), user.id).await?;
+    let player_stats = ActivityService::build_player_stats(pool.get_ref(), user.id).await?;
 
-    Ok(HttpResponse::Ok().json(stats))
+    Ok(HttpResponse::Ok().json(player_stats))
 }
 
 pub fn init(cfg: &mut web::ServiceConfig) {

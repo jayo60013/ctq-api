@@ -4,18 +4,15 @@ use uuid::Uuid;
 
 use crate::error::ApiError;
 use crate::models::{
-    ActivityState, ActivitySummaryResponse, CheckQuoteState, GlobalStats, PlayerStats,
-    StatsResponse,
+    ActivityState, ActivitySummaryResponse, CheckQuoteState, Game, GlobalStats, PlayerStats,
 };
 use crate::repository::{
     get_activity, get_assist_budget_distribution, get_average_score, get_current_streak,
     get_highest_streak, get_puzzle_global_stats, get_puzzle_percentile,
-    get_puzzles_with_activities_by_date_range, get_total_played_puzzles, get_total_solved_puzzles,
-    is_puzzle_solved, update_puzzle_global_stats, upsert_activity,
+    get_puzzles_with_activities_by_date_range, get_total_solved_puzzles, is_puzzle_solved,
+    update_puzzle_global_stats, upsert_activity,
 };
-use crate::transformer::{
-    build_score_distribution, build_score_distribution_with_rounding, RoundingStrategy,
-};
+use crate::transformer::build_score_distribution;
 
 pub struct ActivityService;
 
@@ -51,31 +48,6 @@ impl ActivityService {
             .collect();
 
         Ok(response)
-    }
-
-    #[allow(clippy::cast_precision_loss)]
-    pub async fn get_stats(pool: &PgPool, user_id: Uuid) -> Result<StatsResponse, ApiError> {
-        let total_played_puzzles = get_total_played_puzzles(pool, user_id).await?;
-        let current_streak = get_current_streak(pool, user_id).await?;
-        let highest_streak = get_highest_streak(pool, user_id).await?;
-
-        // Get the score distribution for solved puzzles
-        let distribution = get_assist_budget_distribution(pool, user_id).await?;
-
-        // Calculate total solved puzzles and build distribution buckets
-        let total_solved: i64 = distribution.iter().map(|(_, _, count)| count).sum();
-        let score_distribution = build_score_distribution_with_rounding(
-            &distribution,
-            total_solved,
-            RoundingStrategy::OneDecimalPercentage,
-        );
-
-        Ok(StatsResponse {
-            total_played_puzzles,
-            current_streak,
-            highest_streak,
-            score_distribution,
-        })
     }
 
     /// Builds player stats (streaks, average, distribution) for a specific user
@@ -152,7 +124,7 @@ impl ActivityService {
         pool: &PgPool,
         user_id: Uuid,
         puzzle_id: Uuid,
-    ) -> Result<(i32, CheckQuoteState), ApiError> {
+    ) -> Result<CheckQuoteState, ApiError> {
         // Check if this was previously solved
         let was_already_solved = is_puzzle_solved(pool, user_id, puzzle_id)
             .await
@@ -190,9 +162,19 @@ impl ActivityService {
         let player = Self::build_player_stats(pool, user_id).await?;
         let global = Self::build_global_stats(pool, puzzle_id, score).await?;
 
-        let state = CheckQuoteState { player, global };
+        let game = Game {
+            score,
+            checks_used,
+            solves_used,
+        };
 
-        Ok((score, state))
+        let state = CheckQuoteState {
+            game: Some(game),
+            player,
+            global,
+        };
+
+        Ok(state)
     }
 
     /// Records an archive puzzle solution (`is_daily_flag=false`)
@@ -201,7 +183,7 @@ impl ActivityService {
         pool: &PgPool,
         user_id: Uuid,
         puzzle_id: Uuid,
-    ) -> Result<(i32, CheckQuoteState), ApiError> {
+    ) -> Result<CheckQuoteState, ApiError> {
         // Check if this was previously solved
         let was_already_solved = is_puzzle_solved(pool, user_id, puzzle_id)
             .await
@@ -239,8 +221,18 @@ impl ActivityService {
         let player = Self::build_player_stats(pool, user_id).await?;
         let global = Self::build_global_stats(pool, puzzle_id, score).await?;
 
-        let state = CheckQuoteState { player, global };
+        let game = Game {
+            score,
+            checks_used,
+            solves_used,
+        };
 
-        Ok((score, state))
+        let state = CheckQuoteState {
+            game: Some(game),
+            player,
+            global,
+        };
+
+        Ok(state)
     }
 }

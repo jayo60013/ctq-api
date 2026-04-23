@@ -202,12 +202,11 @@ pub async fn check_daily_quote(
     // If user is authenticated and quote is correct, handle stats and mark as solved
     if is_correct {
         if let Ok(user) = extract_authenticated_user(&req, jwt_service.get_ref()) {
-            let (score, state) =
+            let state =
                 ActivityService::record_solution(pool.get_ref(), user.id, puzzle.id).await?;
 
             let response = CheckQuoteResponse {
                 is_quote_correct: true,
-                score: Some(score),
                 state: Some(state),
             };
             Ok(HttpResponse::Ok().json(response))
@@ -215,7 +214,6 @@ pub async fn check_daily_quote(
             // Correct but unauthenticated
             let response = CheckQuoteResponse {
                 is_quote_correct: true,
-                score: None,
                 state: None,
             };
             Ok(HttpResponse::Ok().json(response))
@@ -224,7 +222,6 @@ pub async fn check_daily_quote(
         // Incorrect answer
         let response = CheckQuoteResponse {
             is_quote_correct: false,
-            score: None,
             state: None,
         };
         Ok(HttpResponse::Ok().json(response))

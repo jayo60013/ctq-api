@@ -62,7 +62,7 @@ pub async fn upsert_activity(
     sqlx::query(
         r"
         INSERT INTO activities (user_id, puzzle_id, checks_used, solves_used, is_solved, is_daily_flag, completed_at, current_streak, assist_budget)
-        VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = true THEN now() ELSE NULL END, $7, $3 + ($4 * 2))
+        VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = true THEN now() ELSE NULL END, $7, 6 - ($3 + ($4 * 2)))
         ON CONFLICT (user_id, puzzle_id)
         DO UPDATE SET
             checks_used = EXCLUDED.checks_used,
@@ -70,7 +70,7 @@ pub async fn upsert_activity(
             is_solved = EXCLUDED.is_solved,
             is_daily_flag = EXCLUDED.is_daily_flag,
             current_streak = EXCLUDED.current_streak,
-            assist_budget = EXCLUDED.checks_used + (EXCLUDED.solves_used * 2),
+            assist_budget = 6 - (EXCLUDED.checks_used + (EXCLUDED.solves_used * 2)),
             completed_at = CASE
                 WHEN EXCLUDED.is_solved = true THEN now()
                 ELSE activities.completed_at
@@ -171,22 +171,6 @@ pub async fn get_puzzles_with_activities_by_date_range(
     Ok(results)
 }
 
-pub async fn get_total_played_puzzles(pool: &PgPool, user_id: Uuid) -> Result<i64, ApiError> {
-    let count = sqlx::query_scalar::<_, i64>(
-        r"
-        SELECT COUNT(*) as total
-        FROM activities
-        WHERE user_id = $1
-        ",
-    )
-    .bind(user_id)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
-
-    Ok(count)
-}
-
 pub async fn get_current_streak(pool: &PgPool, user_id: Uuid) -> Result<i32, ApiError> {
     let streak = sqlx::query_scalar::<_, Option<i32>>(
         r"
@@ -273,12 +257,12 @@ pub async fn increment_activity_usage(
     sqlx::query(
         r"
         INSERT INTO activities (user_id, puzzle_id, checks_used, solves_used, is_solved, is_daily_flag, completed_at, current_streak, assist_budget)
-        VALUES ($1, $2, $3, $4, false, false, NULL, 0, $3 + ($4 * 2))
+        VALUES ($1, $2, $3, $4, false, false, NULL, 0, 6 - ($3 + ($4 * 2)))
         ON CONFLICT (user_id, puzzle_id)
         DO UPDATE SET
             checks_used = $3,
             solves_used = $4,
-            assist_budget = $3 + ($4 * 2)
+            assist_budget = 6 - ($3 + ($4 * 2))
         ",
     )
     .bind(user_id)

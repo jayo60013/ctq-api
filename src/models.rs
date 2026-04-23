@@ -17,7 +17,7 @@ pub use activity::{ActivityRow, ActivityState, ActivitySummaryResponse};
 pub use auth::{AuthResponse, GoogleIdTokenPayload, GoogleTokenResponse};
 pub use budget::Budget;
 pub use check_letter::{CheckLetterRequest, CheckLetterResponse};
-pub use check_quote::{CheckQuoteRequest, CheckQuoteResponse, CheckQuoteState, PlayerStats};
+pub use check_quote::{CheckQuoteRequest, CheckQuoteResponse, CheckQuoteState, Game, PlayerStats};
 pub use global_stats::{GlobalStats, GlobalStatsBucket};
 pub use problem_details::ProblemDetails;
 pub use puzzle_response::PuzzleResponse;

@@ -23,7 +23,17 @@ pub struct PlayerStats {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct Game {
+    pub score: i32,
+    pub checks_used: i32,
+    pub solves_used: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CheckQuoteState {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub game: Option<Game>,
     pub player: PlayerStats,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub global: Option<GlobalStats>,
@@ -33,8 +43,6 @@ pub struct CheckQuoteState {
 #[serde(rename_all = "camelCase")]
 pub struct CheckQuoteResponse {
     pub is_quote_correct: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub score: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<CheckQuoteState>,
 }

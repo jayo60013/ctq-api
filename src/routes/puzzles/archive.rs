@@ -211,19 +211,16 @@ pub async fn check_quote(
     let is_correct = PuzzleService::check_quote(&body.cipher_map, &puzzle.cipher_map);
 
     if is_correct {
-        let (score, state) =
-            ActivityService::record_archive_solution(pool.get_ref(), user.id, *id).await?;
+        let state = ActivityService::record_archive_solution(pool.get_ref(), user.id, *id).await?;
 
         let response = CheckQuoteResponse {
             is_quote_correct: true,
-            score: Some(score),
             state: Some(state),
         };
         Ok(HttpResponse::Ok().json(response))
     } else {
         let response = CheckQuoteResponse {
             is_quote_correct: false,
-            score: None,
             state: None,
         };
         Ok(HttpResponse::Ok().json(response))
