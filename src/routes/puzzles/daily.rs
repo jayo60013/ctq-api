@@ -4,6 +4,7 @@ use validator::Validate;
 
 use crate::{
     error::ApiError,
+    metrics::{LETTER_CHECKS_TOTAL, LETTER_SOLVES_TOTAL, PUZZLE_SOLVED_TOTAL},
     middleware::extract_authenticated_user,
     models::PuzzleState,
     models::{
@@ -128,6 +129,10 @@ pub async fn check_daily_letter(
         increment_activity_usage(pool.get_ref(), user.id, puzzle.id, 1, 0).await?;
     }
 
+    LETTER_CHECKS_TOTAL
+        .with_label_values(&["daily", if is_correct { "true" } else { "false" }])
+        .inc();
+
     let response = CheckLetterResponse {
         is_letter_correct: is_correct,
     };
@@ -170,6 +175,8 @@ pub async fn solve_daily_letter(
         increment_activity_usage(pool.get_ref(), user.id, puzzle.id, 0, 1).await?;
     }
 
+    LETTER_SOLVES_TOTAL.with_label_values(&["daily"]).inc();
+
     let response = SolveLetterResponse { correct_letter };
     Ok(HttpResponse::Ok().json(response))
 }
@@ -201,6 +208,8 @@ pub async fn check_daily_quote(
 
     // If user is authenticated and quote is correct, handle stats and mark as solved
     if is_correct {
+        PUZZLE_SOLVED_TOTAL.with_label_values(&["daily"]).inc();
+
         if let Ok(user) = extract_authenticated_user(&req, jwt_service.get_ref()) {
             let state =
                 ActivityService::record_solution(pool.get_ref(), user.id, puzzle.id).await?;

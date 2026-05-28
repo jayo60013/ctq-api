@@ -1,6 +1,7 @@
 mod config;
 mod error;
 mod health;
+mod metrics;
 mod middleware;
 mod models;
 mod openapi;
@@ -12,6 +13,7 @@ mod transformer;
 mod validators;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web_prom::PrometheusMetricsBuilder;
 use sqlx::postgres::PgPoolOptions;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -62,6 +64,13 @@ async fn main() -> std::io::Result<()> {
     let config_data = web::Data::new(config.clone());
     let server_port: u16 = 9100;
 
+    let prometheus = PrometheusMetricsBuilder::new("api")
+        .endpoint("/metrics")
+        .build()
+        .unwrap();
+
+    metrics::register_custom_metrics(&prometheus.registry);
+
     tracing::info!("Starting HTTP server on 0.0.0.0:{}", server_port);
 
     HttpServer::new(move || {
@@ -69,6 +78,7 @@ async fn main() -> std::io::Result<()> {
         let cors = create_cors(&allowed_origins);
 
         let app = App::new()
+            .wrap(prometheus.clone())
             .app_data(pool.clone())
             .app_data(config_data.clone())
             .app_data(daily_puzzle_cache.clone())
