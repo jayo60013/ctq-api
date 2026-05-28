@@ -5,7 +5,8 @@ use validator::Validate;
 use crate::models::PuzzleResponse;
 use crate::{
     error::ApiError,
-    middleware,
+    metrics::PUZZLE_SOLVED_TOTAL,
+    middleware::{self, extract_authenticated_user},
     models::{
         CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse,
         PlayerStats, PuzzleState, SolveLetterRequest, SolveLetterResponse,
@@ -202,7 +203,7 @@ pub async fn check_quote(
     req: HttpRequest,
     body: web::Json<CheckQuoteRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let user = middleware::extract_authenticated_user(&req, jwt_service.get_ref())?;
+    let _user = middleware::extract_authenticated_user(&req, jwt_service.get_ref())?;
 
     body.validate()?;
 
@@ -210,14 +211,30 @@ pub async fn check_quote(
     let puzzle = repo.get_by_id(*id).await?;
     let is_correct = PuzzleService::check_quote(&body.cipher_map, &puzzle.cipher_map);
 
+    // If user is authenticated and quote is correct, handle stats and mark as solved
     if is_correct {
-        let state = ActivityService::record_archive_solution(pool.get_ref(), user.id, *id).await?;
+        if let Ok(user) = extract_authenticated_user(&req, jwt_service.get_ref()) {
+            PUZZLE_SOLVED_TOTAL
+                .with_label_values(&["archive", "authenticated"])
+                .inc();
 
-        let response = CheckQuoteResponse {
-            is_quote_correct: true,
-            state: Some(state),
-        };
-        Ok(HttpResponse::Ok().json(response))
+            let state = ActivityService::record_solution(pool.get_ref(), user.id, *id).await?;
+            let response = CheckQuoteResponse {
+                is_quote_correct: true,
+                state: Some(state),
+            };
+            Ok(HttpResponse::Ok().json(response))
+        } else {
+            PUZZLE_SOLVED_TOTAL
+                .with_label_values(&["archive", "guest"])
+                .inc();
+
+            let response = CheckQuoteResponse {
+                is_quote_correct: true,
+                state: None,
+            };
+            Ok(HttpResponse::Ok().json(response))
+        }
     } else {
         let response = CheckQuoteResponse {
             is_quote_correct: false,

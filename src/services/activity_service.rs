@@ -177,8 +177,7 @@ impl ActivityService {
         Ok(state)
     }
 
-    /// Records an archive puzzle solution (`is_daily_flag=false`)
-    /// Same as `record_solution` but for archive puzzles
+    #[allow(dead_code)]
     pub async fn record_archive_solution(
         pool: &PgPool,
         user_id: Uuid,
