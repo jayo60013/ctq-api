@@ -22,6 +22,12 @@ pub static LETTER_SOLVES_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
     IntCounterVec::new(opts, &["puzzle_type"]).unwrap()
 });
 
+pub fn increment_puzzle_solved(puzzle_type: &str, user_type: &str) {
+    PUZZLE_SOLVED_TOTAL
+        .with_label_values(&[puzzle_type, user_type])
+        .inc();
+}
+
 #[allow(dead_code)]
 pub fn register_custom_metrics(registry: &prometheus::Registry) {
     registry
@@ -33,4 +39,23 @@ pub fn register_custom_metrics(registry: &prometheus::Registry) {
     registry
         .register(Box::new(LETTER_SOLVES_TOTAL.clone()))
         .unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PUZZLE_SOLVED_TOTAL;
+
+    #[test]
+    fn puzzle_solved_metric_accepts_two_labels() {
+        assert!(PUZZLE_SOLVED_TOTAL
+            .get_metric_with_label_values(&["daily", "guest"])
+            .is_ok());
+    }
+
+    #[test]
+    fn puzzle_solved_metric_rejects_wrong_label_count() {
+        assert!(PUZZLE_SOLVED_TOTAL
+            .get_metric_with_label_values(&["daily"])
+            .is_err());
+    }
 }

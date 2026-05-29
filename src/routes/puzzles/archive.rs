@@ -5,7 +5,7 @@ use validator::Validate;
 use crate::models::PuzzleResponse;
 use crate::{
     error::ApiError,
-    metrics::PUZZLE_SOLVED_TOTAL,
+    metrics::increment_puzzle_solved,
     middleware::{self, extract_authenticated_user},
     models::{
         CheckLetterRequest, CheckLetterResponse, CheckQuoteRequest, CheckQuoteResponse,
@@ -214,9 +214,7 @@ pub async fn check_quote(
     // If user is authenticated and quote is correct, handle stats and mark as solved
     if is_correct {
         if let Ok(user) = extract_authenticated_user(&req, jwt_service.get_ref()) {
-            PUZZLE_SOLVED_TOTAL
-                .with_label_values(&["archive", "authenticated"])
-                .inc();
+            increment_puzzle_solved("archive", "authenticated");
 
             let state = ActivityService::record_solution(pool.get_ref(), user.id, *id).await?;
             let response = CheckQuoteResponse {
@@ -225,9 +223,7 @@ pub async fn check_quote(
             };
             Ok(HttpResponse::Ok().json(response))
         } else {
-            PUZZLE_SOLVED_TOTAL
-                .with_label_values(&["archive", "guest"])
-                .inc();
+            increment_puzzle_solved("archive", "guest");
 
             let response = CheckQuoteResponse {
                 is_quote_correct: true,
