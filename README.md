@@ -218,14 +218,10 @@ Same request/response format as daily endpoints, but for archived puzzles.
 ### Health Check
 
 #### `GET /health`
-Verify API is running
+Verify the API process is running. This unauthenticated liveness endpoint performs no database or external dependency checks and returns no response body.
 
 **Response (200 OK):**
-```json
-{
-  "status": "healthy"
-}
-```
+Empty response body.
 
 ---
 

@@ -76,7 +76,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(jwt_service.clone())
             .app_data(oauth_service.clone())
             .wrap(cors)
-            .wrap(Logger::default())
+            .wrap(Logger::default().exclude("/health"))
             .configure(routes::init_routes)
             .configure(health::init);
 
