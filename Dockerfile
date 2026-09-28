@@ -8,8 +8,9 @@ RUN cargo build --release
 
 FROM debian:trixie-slim
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    wget \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/ctq-api /usr/local/bin/
